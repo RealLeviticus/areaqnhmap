@@ -69,8 +69,7 @@
 
     main {
       display: grid;
-      grid-template-columns: 1fr 320px;
-      gap: 16px;
+      grid-template-columns: 1fr;
       padding: 16px;
     }
 
@@ -83,55 +82,6 @@
       overflow: hidden;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
       background: #edf1f5; /* light to match base tiles and hide seams */
-    }
-
-    .panel {
-      background: var(--panel);
-      border: 1px solid var(--stroke);
-      border-radius: 12px;
-      padding: 14px;
-      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .panel h2 {
-      margin: 0 0 4px 0;
-      font-size: 1rem;
-      color: var(--text);
-    }
-
-    .panel p {
-      margin: 0;
-      color: var(--muted);
-      font-size: 0.95rem;
-      line-height: 1.5;
-    }
-
-    .legend {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      gap: 8px 10px;
-      align-items: center;
-      font-size: 0.95rem;
-      color: var(--muted);
-    }
-
-    .legend-swatch {
-      width: 16px;
-      height: 16px;
-      border-radius: 4px;
-      border: 1px solid var(--stroke);
-    }
-
-    .note {
-      background: #fff8e1;
-      border: 1px dashed #f0c14b;
-      color: #8b6b00;
-      padding: 10px 12px;
-      border-radius: 10px;
-      font-size: 0.92rem;
     }
 
     .area-label {
@@ -162,16 +112,6 @@
 
   <main>
     <div id="map" aria-label="Area QNH map"></div>
-
-    <section class="panel">
-      <h2>How to swap in accurate boundaries</h2>
-      <p>Replace <code>data/gaf-areas.geojson</code> with real GAF polygons (WGS84). Each feature should have properties <code>area_code</code> and optional <code>name</code>/<code>qnh</code>. The map reloads data on refresh.</p>
-      <div class="legend">
-        <span class="legend-swatch" style="background: var(--area-fill);"></span><span>Area boundary</span>
-        <span class="legend-swatch" style="background: var(--area-fill-highlight);"></span><span>Highlighted (selected)</span>
-      </div>
-      <div class="note">Current polygons are placeholders only. Swap with accurate GAF geometry for production use.</div>
-    </section>
   </main>
 
   <script src="https://unpkg.com/maplibre-gl@3.5.2/dist/maplibre-gl.js"></script>
@@ -271,11 +211,37 @@
         });
 
         map.addLayer({
-          id: 'areas-label',
+          id: 'areas-qnh-label',
           type: 'symbol',
           source: 'areas',
           layout: {
-            'text-field': ['get', 'area_code'],
+            'text-field': ['to-string', ['coalesce', ['get', 'qnh'], '']],
+            'text-font': ['Noto Sans Regular'],
+            'text-size': [
+              'case',
+              ['==', ['get', 'qnhColor'], '#1c8a2c'], 13,
+              15
+            ],
+            'text-allow-overlap': true,
+            'text-ignore-placement': true,
+            'text-variable-anchor': ['center'],
+            'text-justify': 'center',
+            'symbol-z-order': 'source',
+            'text-offset': [0, -1.0],
+          },
+          paint: {
+            'text-color': ['coalesce', ['get', 'qnhColor'], '#000000'],
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1.2,
+          }
+        });
+
+        map.addLayer({
+          id: 'areas-name-label',
+          type: 'symbol',
+          source: 'areas',
+          layout: {
+            'text-field': ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
             'text-font': ['Noto Sans Regular'],
             'text-size': 11,
             'text-allow-overlap': true,
@@ -283,6 +249,7 @@
             'text-variable-anchor': ['center'],
             'text-justify': 'center',
             'symbol-z-order': 'source',
+            'text-offset': [0, 0.6],
           },
           paint: {
             'text-color': '#c40000',
@@ -290,6 +257,9 @@
             'text-halo-width': 1.0,
           }
         });
+
+          // If QNH already fetched before areas load, apply now
+          applyAreaQnhToPolygons();
 
         fitToAreas(geojson);
 
@@ -320,8 +290,15 @@
     }
 
     // --- QNH fetching & route drawing ---
+    // Primary BOM page (CORS-blocked) with fallback proxies
     const BOM_QNH_URL = 'https://www.bom.gov.au/aviation/forecasts/area-qnh/';
+    const BOM_QNH_FALLBACKS = [
+      (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+      // Jina fetches as readable text; still parsable because we regex AREA lines
+      (url) => `https://r.jina.ai/${url.replace(/^https?:\/\//, 'https://')}`,
+    ];
     let qnhGeoJSON = { type: 'FeatureCollection', features: [] };
+    let areaQnhMap = {};
 
     function startQNHLoop() {
       fetchAndDrawQNH();
@@ -329,16 +306,17 @@
     }
 
     async function fetchAndDrawQNH() {
-      await airspaceReady;
       try {
-        const res = await fetch(BOM_QNH_URL, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const html = await res.text();
-        const text = html.replace(/<[^>]+>/g, '\n');
-        const routes = parseQNHText(text);
+        const text = await fetchBomQnhText();
+        const parsed = parseQNHText(text);
+        areaQnhMap = parsed.areaQnhMap;
+        applyAreaQnhToPolygons();
+
+        // Only lines need airspace coordinates
+        await airspaceReady;
         qnhGeoJSON = {
           type: 'FeatureCollection',
-          features: routes
+          features: parsed.routes
             .filter(r => r.coords.length >= 2)
             .map((r, i) => ({
               type: 'Feature',
@@ -350,6 +328,48 @@
         upsertQnhLayers();
       } catch (err) {
         console.error('Failed to fetch/parse QNH', err);
+      }
+    }
+
+    // Try direct fetch first; then CORS-friendly fallbacks
+    async function fetchBomQnhText() {
+      const attempts = [
+        BOM_QNH_URL,
+        ...BOM_QNH_FALLBACKS.map(fn => fn(BOM_QNH_URL)),
+      ];
+      let lastErr = null;
+      for (const url of attempts) {
+        try {
+          const res = await fetch(url, { cache: 'no-store' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const txt = await res.text();
+          if (txt) return txt;
+        } catch (e) {
+          lastErr = e;
+          console.warn('QNH fetch attempt failed', url, e);
+        }
+      }
+      throw lastErr || new Error('All QNH fetch attempts failed');
+    }
+
+    function applyAreaQnhToPolygons() {
+      if (!areaGeoJSON) return;
+      let changed = false;
+      areaGeoJSON.features.forEach((f) => {
+        const code = f.properties?.area_code;
+        const match = code ? areaQnhMap[code] : null;
+        if (match) {
+          f.properties.qnh = match.qnh;
+          f.properties.qnhColor = match.color || '#000000';
+          changed = true;
+        } else if (f.properties.qnh || f.properties.qnhColor) {
+          f.properties.qnh = null;
+          f.properties.qnhColor = null;
+          changed = true;
+        }
+      });
+      if (changed && map.getSource('areas')) {
+        map.getSource('areas').setData(areaGeoJSON);
       }
     }
 
@@ -392,18 +412,21 @@
     function parseQNHText(text) {
       const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
       const routes = [];
+      const areaQnhMapLocal = {};
       const areaRe = /AREA\s*-?\s*(\d+)/i;
       lines.forEach((line) => {
         const areaMatch = line.match(areaRe);
         if (!areaMatch) return;
         const areaCode = `AREA-${areaMatch[1]}`;
-        // Split segments by commas
         const segments = line.split(',').map(s => s.trim());
         segments.forEach(seg => {
           const m = seg.match(/([A-Z0-9\/\s]+)\s+(\d{3,4})/);
           if (!m) return;
           const routeStr = m[1].trim();
           const qnh = Number(m[2]);
+          if (!areaQnhMapLocal[areaCode]) {
+            areaQnhMapLocal[areaCode] = { qnh, color: '#1c8a2c' };
+          }
           const ids = (routeStr.match(/[A-Z]{3,5}/g) || []).map(s => s.trim());
           const coords = ids
             .map(id => lookupCoord(id))
@@ -413,7 +436,7 @@
           }
         });
       });
-      return routes;
+      return { routes, areaQnhMap: areaQnhMapLocal };
     }
 
     function lookupCoord(id) {
