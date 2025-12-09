@@ -4,96 +4,48 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Area QNH Map</title>
-  <link
-    rel="stylesheet"
-    href="https://unpkg.com/maplibre-gl@3.5.2/dist/maplibre-gl.css"
-  />
+  <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@3.5.2/dist/maplibre-gl.css" />
   <style>
     :root {
-      --bg: #ffffff;
       --panel: #f7f7f7;
-      --accent: #0066cc;
-      --text: #111111;
-      --muted: #4f4f55;
       --stroke: #d6d6d6;
-      --area-stroke: #d40000;
-      --area-fill: rgba(255, 255, 255, 0.35);
-      --area-fill-highlight: rgba(255, 230, 230, 0.55);
       --label-red: #c40000;
-      --label-blue: #0054a6;
     }
-
-    * { box-sizing: border-box; }
     body {
       margin: 0;
       font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      min-height: 100vh;
+      background: #ffffff;
+      color: #111;
       display: grid;
       grid-template-rows: auto 1fr;
+      min-height: 100vh;
     }
-
     header {
       padding: 14px 18px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      gap: 12px;
       background: var(--panel);
       border-bottom: 1px solid var(--stroke);
-      position: sticky;
-      top: 0;
-      z-index: 1000;
+      gap: 8px;
+      flex-wrap: wrap;
     }
-
-    .title {
-      display: flex;
-      flex-direction: column;
-      gap: 3px;
-    }
-
-    .title h1 {
-      margin: 0;
-      font-size: 1.1rem;
-      letter-spacing: 0.02em;
-    }
-
-    .title .sub {
-      margin: 0;
+    .title h1 { margin: 0; font-size: 1.1rem; }
+    .title .sub { margin: 0; font-size: 0.9rem; color: #555; }
+    #validity {
+      margin-left: auto;
       font-size: 0.9rem;
-      color: var(--muted);
+      color: #444;
+      white-space: nowrap;
     }
-
-    .badges { display: none; }
-
-    main {
-      display: grid;
-      grid-template-columns: 1fr;
-      padding: 16px;
-    }
-
+    main { padding: 16px; }
     #map {
       width: 100%;
       height: 72vh;
-      min-height: 520px;
       border: 1px solid var(--stroke);
       border-radius: 12px;
-      overflow: hidden;
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
-      background: #edf1f5; /* light to match base tiles and hide seams */
-    }
-
-    .area-label {
-      color: var(--label-red);
-      font-weight: 700;
-      font-size: 10px;
-      text-shadow: 0 1px 1px rgba(255, 255, 255, 0.75);
-    }
-
-    @media (max-width: 1024px) {
-      main { grid-template-columns: 1fr; }
-      #map { height: 64vh; min-height: 420px; }
+      background: #edf1f5;
     }
   </style>
 </head>
@@ -101,13 +53,9 @@
   <header>
     <div class="title">
       <h1>Area QNH Map</h1>
-      <p class="sub">Replicate of the BOM Area QNH Map which was removed with the new BOM website.</p>
+      <p class="sub">Replicate of the BOM Area QNH Map removed from the new BOM website.</p>
     </div>
-    <div class="badges">
-      <span class="badge">Static single-page</span>
-      <span class="badge">Leaflet overlay</span>
-      <span class="badge">Area labels</span>
-    </div>
+    <div id="validity">Fetching QNH…</div>
   </header>
 
   <main>
@@ -116,189 +64,107 @@
 
   <script src="https://unpkg.com/maplibre-gl@3.5.2/dist/maplibre-gl.js"></script>
   <script>
-    // MapLibre GL map with OSM raster tiles (simple, no seams);
-    // Protomaps vector can be added if you supply an API key or pmtiles URL.
-    const osmRasterStyle = {
-      version: 8,
-      glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-      sources: {
-        osm: {
-          type: 'raster',
-          tiles: [
-            'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
-          ],
-          tileSize: 256,
-          attribution: '© OpenStreetMap contributors',
-        },
-      },
-      layers: [
-        {
-          id: 'osm-base',
-          type: 'raster',
-          source: 'osm',
-          minzoom: 0,
-          maxzoom: 19,
-        }
-      ],
-    };
-
     const map = new maplibregl.Map({
       container: 'map',
-      style: osmRasterStyle,
+      style: {
+        version: 8,
+        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+        sources: {
+          osm: {
+            type: 'raster',
+            tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
+            tileSize: 256,
+            attribution: '© OpenStreetMap contributors'
+          }
+        },
+        layers: [{ id: 'osm-base', type: 'raster', source: 'osm' }]
+      },
       center: [134.5, -25.5],
-      zoom: 3.6,
-      cooperativeGestures: false, // allow zoom without holding Ctrl
-      scrollZoom: true,
-      attributionControl: true,
+      zoom: 3.6
     });
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), 'top-left');
 
-    let activeFeatureId = null;
+    map.addControl(new maplibregl.NavigationControl(), 'top-left');
+
+    const AREA_DATA_URL = 'data/gaf-areas.geojson';
+    const QNH_WORKER_URL = 'https://areaqnh.therealleviticus.workers.dev/';
+
     let areaGeoJSON = null;
-    let airspaceLoaded = false;
-    let airspaceReady = new Promise((resolve) => {
-      const wait = () => {
-        if (window.airspaceData?.airports?.length || window.airspaceData?.waypoints?.length) {
-          airspaceLoaded = true;
-          resolve();
-        } else {
-          setTimeout(wait, 200);
-        }
-      };
-      wait();
-    });
+    let areaQnhMap = {};
 
     map.on('load', () => {
       loadAreas();
-      // Kick off QNH fetch loop after map and airspace are ready
       startQNHLoop();
     });
 
     async function loadAreas() {
-      try {
-        const res = await fetch('data/gaf-areas.geojson');
-        const geojson = await res.json();
-        geojson.features.forEach((f, i) => { f.id = i + 1; });
-        areaGeoJSON = geojson;
+      const res = await fetch(AREA_DATA_URL);
+      const geojson = await res.json();
+      geojson.features.forEach((f, i) => f.id = i + 1);
+      areaGeoJSON = geojson;
 
-        map.addSource('areas', {
-          type: 'geojson',
-          data: geojson,
-        });
+      map.addSource('areas', { type: 'geojson', data: geojson });
 
-        map.addLayer({
-          id: 'areas-fill',
-          type: 'fill',
-          source: 'areas',
-          paint: {
-            'fill-color': [
-              'case',
-              ['boolean', ['feature-state', 'active'], false], '#ffe6e6',
-              ['coalesce', ['get', 'color'], '#ffffffcc']
-            ],
-            'fill-opacity': 0.35,
-          }
-        });
+      map.addLayer({
+        id: 'areas-fill',
+        type: 'fill',
+        source: 'areas',
+        paint: { 'fill-color': '#ffffff', 'fill-opacity': 0.30 }
+      });
 
-        map.addLayer({
-          id: 'areas-line',
-          type: 'line',
-          source: 'areas',
-          paint: {
-            'line-color': '#d40000',
-            'line-width': 2,
-          }
-        });
+      map.addLayer({
+        id: 'areas-line',
+        type: 'line',
+        source: 'areas',
+        paint: { 'line-color': '#d40000', 'line-width': 2 }
+      });
 
-        map.addLayer({
-          id: 'areas-qnh-label',
-          type: 'symbol',
-          source: 'areas',
-          layout: {
-            'text-field': ['to-string', ['coalesce', ['get', 'qnh'], '']],
-            'text-font': ['Noto Sans Regular'],
-            'text-size': [
-              'case',
-              ['==', ['get', 'qnhColor'], '#1c8a2c'], 13,
-              15
-            ],
-            'text-allow-overlap': true,
-            'text-ignore-placement': true,
-            'text-variable-anchor': ['center'],
-            'text-justify': 'center',
-            'symbol-z-order': 'source',
-            'text-offset': [0, -1.0],
-          },
-          paint: {
-            'text-color': ['coalesce', ['get', 'qnhColor'], '#000000'],
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1.2,
-          }
-        });
+      // QNH label (black) above
+      map.addLayer({
+        id: 'areas-qnh',
+        type: 'symbol',
+        source: 'areas',
+        layout: {
+          'text-field': ['to-string', ['coalesce', ['get', 'qnh'], '']],
+          'text-font': ['Open Sans Regular'],
+          'text-size': 18,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+          'text-variable-anchor': ['center'],
+          'text-offset': [0, -0.9],
+          'symbol-z-order': 'source'
+        },
+        paint: {
+          'text-color': '#000',
+          'text-halo-color': '#fff',
+          'text-halo-width': 1.4
+        }
+      });
 
-        map.addLayer({
-          id: 'areas-name-label',
-          type: 'symbol',
-          source: 'areas',
-          layout: {
-            'text-field': ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
-            'text-font': ['Noto Sans Regular'],
-            'text-size': 11,
-            'text-allow-overlap': true,
-            'text-ignore-placement': true,
-            'text-variable-anchor': ['center'],
-            'text-justify': 'center',
-            'symbol-z-order': 'source',
-            'text-offset': [0, 0.6],
-          },
-          paint: {
-            'text-color': '#c40000',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1.0,
-          }
-        });
+      // Area label (red) below
+      map.addLayer({
+        id: 'areas-name',
+        type: 'symbol',
+        source: 'areas',
+        layout: {
+          'text-field': ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
+          'text-font': ['Open Sans Regular'],
+          'text-size': 11,
+          'text-allow-overlap': true,
+          'text-ignore-placement': true,
+          'text-variable-anchor': ['center'],
+          'text-offset': [0, 1.0],
+          'symbol-z-order': 'source'
+        },
+        paint: {
+          'text-color': '#c40000',
+          'text-halo-color': '#fff',
+          'text-halo-width': 1.0
+        }
+      });
 
-          // If QNH already fetched before areas load, apply now
-          applyAreaQnhToPolygons();
-
-        fitToAreas(geojson);
-
-        map.on('mousemove', 'areas-fill', (e) => {
-          if (!e.features?.length) return;
-          map.getCanvas().style.cursor = 'pointer';
-        });
-        map.on('mouseleave', 'areas-fill', () => {
-          map.getCanvas().style.cursor = '';
-        });
-
-        map.on('click', 'areas-line', (e) => {
-          if (!e.features?.length) return;
-          const feature = e.features[0];
-          setActiveFeature(feature.id);
-          const code = feature.properties?.area_code || 'Area';
-          const name = feature.properties?.name || '';
-          const qnh = feature.properties?.qnh ? `QNH: ${feature.properties.qnh}` : 'QNH: TBD';
-          const title = [code, name].filter(Boolean).join(' · ');
-          new maplibregl.Popup({ closeOnMove: true })
-            .setLngLat(e.lngLat)
-            .setHTML(`<strong>${title}</strong><br/>${qnh}`)
-            .addTo(map);
-        });
-      } catch (err) {
-        console.error('Failed to load GeoJSON', err);
-      }
+      applyAreaQnhToPolygons();
+      fitToAreas(geojson);
     }
-
-    // --- QNH fetching & route drawing ---
-    // Primary BOM page (CORS-blocked) with fallback proxies
-    const BOM_QNH_URL = 'https://www.bom.gov.au/aviation/forecasts/area-qnh/';
-    const BOM_QNH_FALLBACKS = [
-      (url) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
-      // Jina fetches as readable text; still parsable because we regex AREA lines
-      (url) => `https://r.jina.ai/${url.replace(/^https?:\/\//, 'https://')}`,
-    ];
-    let qnhGeoJSON = { type: 'FeatureCollection', features: [] };
-    let areaQnhMap = {};
 
     function startQNHLoop() {
       fetchAndDrawQNH();
@@ -306,292 +172,128 @@
     }
 
     async function fetchAndDrawQNH() {
+      const validityBox = document.getElementById('validity');
       try {
-        const text = await fetchBomQnhText();
+        const res = await fetch(QNH_WORKER_URL + '?t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const raw = await res.text();
+
+        // --- CLEAN: keep line breaks, strip tags/scripts/styles, decode entities
+        let text = raw
+          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<\/(p|div|li|h\d|section)>/gi, '\n')
+          .replace(/<[^>]+>/g, ' ')           // tags -> space (not newline)
+          .replace(/&nbsp;/g, ' ')
+          .replace(/&amp;/g, '&')
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          // normalise whitespace but PRESERVE newlines:
+          .replace(/[ \t]+\n/g, '\n')
+          .replace(/\n[ \t]+/g, '\n')
+          .replace(/\n{3,}/g, '\n\n')
+          .trim();
+
         const parsed = parseQNHText(text);
         areaQnhMap = parsed.areaQnhMap;
         applyAreaQnhToPolygons();
 
-        // Only lines need airspace coordinates
-        await airspaceReady;
-        qnhGeoJSON = {
-          type: 'FeatureCollection',
-          features: parsed.routes
-            .filter(r => r.coords.length >= 2)
-            .map((r, i) => ({
-              type: 'Feature',
-              id: i + 1,
-              properties: { qnh: r.qnh, label: r.qnh?.toString() || '' },
-              geometry: { type: 'LineString', coordinates: r.coords }
-            }))
-        };
-        upsertQnhLayers();
+        // Compact validity header
+        const v = parsed.validIssued;
+        validityBox.textContent = v ? `Valid: ${v.valid} · Issued: ${v.issued}` : 'Validity unknown';
       } catch (err) {
         console.error('Failed to fetch/parse QNH', err);
-      }
-    }
-
-    // Try direct fetch first; then CORS-friendly fallbacks
-    async function fetchBomQnhText() {
-      const attempts = [
-        BOM_QNH_URL,
-        ...BOM_QNH_FALLBACKS.map(fn => fn(BOM_QNH_URL)),
-      ];
-      let lastErr = null;
-      for (const url of attempts) {
-        try {
-          const res = await fetch(url, { cache: 'no-store' });
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          const txt = await res.text();
-          if (txt) return txt;
-        } catch (e) {
-          lastErr = e;
-          console.warn('QNH fetch attempt failed', url, e);
-        }
-      }
-      throw lastErr || new Error('All QNH fetch attempts failed');
-    }
-
-    function applyAreaQnhToPolygons() {
-      if (!areaGeoJSON) return;
-      let changed = false;
-      areaGeoJSON.features.forEach((f) => {
-        const code = f.properties?.area_code;
-        const match = code ? areaQnhMap[code] : null;
-        if (match) {
-          f.properties.qnh = match.qnh;
-          f.properties.qnhColor = match.color || '#000000';
-          changed = true;
-        } else if (f.properties.qnh || f.properties.qnhColor) {
-          f.properties.qnh = null;
-          f.properties.qnhColor = null;
-          changed = true;
-        }
-      });
-      if (changed && map.getSource('areas')) {
-        map.getSource('areas').setData(areaGeoJSON);
-      }
-    }
-
-    function upsertQnhLayers() {
-      if (!map.getSource('qnh-routes')) {
-        map.addSource('qnh-routes', { type: 'geojson', data: qnhGeoJSON });
-        map.addLayer({
-          id: 'qnh-routes-line',
-          type: 'line',
-          source: 'qnh-routes',
-          paint: {
-            'line-color': '#1c8a2c',
-            'line-width': 2.5,
-          }
-        });
-        map.addLayer({
-          id: 'qnh-routes-label',
-          type: 'symbol',
-          source: 'qnh-routes',
-          layout: {
-            'text-field': ['get', 'label'],
-            'text-font': ['Noto Sans Regular'],
-            'text-size': 11,
-            'text-allow-overlap': true,
-            'text-ignore-placement': true,
-            'symbol-placement': 'line',
-            'symbol-spacing': 250,
-          },
-          paint: {
-            'text-color': '#1c8a2c',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1.0,
-          }
-        });
-      } else {
-        map.getSource('qnh-routes').setData(qnhGeoJSON);
+        document.getElementById('validity').textContent = 'Failed to fetch QNH';
       }
     }
 
     function parseQNHText(text) {
-      const lines = text.split(/\n+/).map(l => l.trim()).filter(Boolean);
-      const routes = [];
+      // Split into real lines (we preserved newlines above)
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+
+      // Build blocks: "Area XX:" until the next "Area" or EOF or "Valid:"
+      const blocks = [];
+      let current = null;
+      for (const line of lines) {
+        const m = line.match(/^(?:AREA|Area)\s*(\d+)\s*:/);
+        if (m) {
+          if (current) blocks.push(current);
+          current = { area: `AREA-${m[1]}`, lines: [] };
+          continue;
+        }
+        if (/^Valid:/i.test(line) && current) {
+          blocks.push(current);
+          current = null;
+          // do not break; keep scanning to harvest later Valid/Issued occurrences
+          continue;
+        }
+        if (current) current.lines.push(line);
+      }
+      if (current) blocks.push(current);
+
+      // Last 4-digit number per block is the QNH
       const areaQnhMapLocal = {};
-      const areaRe = /AREA\s*-?\s*(\d+)/i;
-      lines.forEach((line) => {
-        const areaMatch = line.match(areaRe);
-        if (!areaMatch) return;
-        const areaCode = `AREA-${areaMatch[1]}`;
-        const segments = line.split(',').map(s => s.trim());
-        segments.forEach(seg => {
-          const m = seg.match(/([A-Z0-9\/\s]+)\s+(\d{3,4})/);
-          if (!m) return;
-          const routeStr = m[1].trim();
-          const qnh = Number(m[2]);
-          if (!areaQnhMapLocal[areaCode]) {
-            areaQnhMapLocal[areaCode] = { qnh, color: '#1c8a2c' };
-          }
-          const ids = (routeStr.match(/[A-Z]{3,5}/g) || []).map(s => s.trim());
-          const coords = ids
-            .map(id => lookupCoord(id))
-            .filter(Boolean);
-          if (coords.length >= 2) {
-            routes.push({ area: areaCode, qnh, coords });
-          }
-        });
-      });
-      return { routes, areaQnhMap: areaQnhMapLocal };
-    }
-
-    function lookupCoord(id) {
-      if (!window.airspaceData) return null;
-      const { airports = [], waypoints = [] } = window.airspaceData;
-      const hit = airports.find(a => a.id === id || a.name === id) || waypoints.find(w => w.id === id || w.name === id);
-      return hit ? [hit.lon, hit.lat] : null;
-    }
-
-    function setActiveFeature(id) {
-      if (activeFeatureId !== null) {
-        map.setFeatureState({ source: 'areas', id: activeFeatureId }, { active: false });
+      for (const b of blocks) {
+        const txt = b.lines.join(' ');
+        const q = txt.match(/(\d{4})(?!.*\d{4})/);
+        const qnh = q ? Number(q[1]) : null;
+        if (qnh && qnh >= 900 && qnh <= 1050) {
+          areaQnhMapLocal[b.area] = { qnh };
+        }
       }
-      activeFeatureId = id;
-      if (id !== null && id !== undefined) {
-        map.setFeatureState({ source: 'areas', id }, { active: true });
-      }
+
+      // Pull the last Valid / Issued in the entire text (there are several)
+      const validAll = [...text.matchAll(/Valid:\s*([^\n]*?)(?=Issued:|\n|$)/gi)];
+      const issuedAll = [...text.matchAll(/Issued:\s*([^\n]*)/gi)];
+      const validIssued = (validAll.length && issuedAll.length)
+        ? { valid: validAll.at(-1)[1].trim(), issued: issuedAll.at(-1)[1].trim() }
+        : null;
+
+      return { areaQnhMap: areaQnhMapLocal, validIssued };
     }
 
-    function clearHoverStates() {
-      const source = map.getSource('areas');
-      if (!source || !source._data?.features) return;
-      source._data.features.forEach((f) => {
-        if (f.id !== undefined) {
-          map.setFeatureState({ source: 'areas', id: f.id }, { hover: false });
+    function applyAreaQnhToPolygons() {
+      if (!areaGeoJSON) return;
+      let count = 0;
+      areaGeoJSON.features.forEach(f => {
+        const code = f.properties?.area_code?.toUpperCase();
+        const match = areaQnhMap[code];
+        if (match) {
+          f.properties.qnh = match.qnh;
+          count++;
+        } else {
+          delete f.properties.qnh;
         }
       });
+      if (map.getSource('areas')) map.getSource('areas').setData(areaGeoJSON);
+      console.log('Applied QNH to', count, 'areas');
     }
 
     function fitToAreas(geojson) {
       const bounds = getGeoJsonBounds(geojson);
-      if (bounds) {
-        map.fitBounds(bounds, { padding: 40, maxZoom: 6 });
-      }
+      if (bounds) map.fitBounds(bounds, { padding: 40, maxZoom: 6 });
     }
 
     function getGeoJsonBounds(geojson) {
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      const update = (coord) => {
-        const [x, y] = coord;
+      const update = ([x, y]) => {
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        if (x < -180 || x > 180 || y < -90 || y > 90) return;
         if (x < minX) minX = x;
         if (x > maxX) maxX = x;
         if (y < minY) minY = y;
         if (y > maxY) maxY = y;
       };
-      const walk = (coords) => {
-        if (typeof coords[0] === 'number') {
-          update(coords);
-        } else {
-          coords.forEach(walk);
-        }
+      const walk = coords => {
+        if (!Array.isArray(coords)) return;
+        if (typeof coords[0] === 'number') update(coords);
+        else coords.forEach(walk);
       };
       if (!geojson?.features) return null;
-      geojson.features.forEach((f) => {
-        if (f.geometry?.coordinates) walk(f.geometry.coordinates);
-      });
+      geojson.features.forEach(f => f.geometry?.coordinates && walk(f.geometry.coordinates));
       if (!Number.isFinite(minX)) return null;
       return [[minX, minY], [maxX, maxY]];
-    }
-
-
-    // --- Airspace data (airports + waypoints), cached monthly ---
-    const AIRSPACE_URL = 'https://raw.githubusercontent.com/vatSys/australia-dataset/master/Airspace.xml';
-    const AIRSPACE_CACHE_KEY = 'airspace-cache-v1';
-    const AIRSPACE_CACHE_DATE_KEY = 'airspace-cache-date-v1';
-    window.airspaceData = { airports: [], waypoints: [] };
-
-    loadAirspaceData();
-
-    async function loadAirspaceData() {
-      const today = new Date();
-      const isFirstOfMonth = today.getDate() === 1;
-      const cachedDateStr = localStorage.getItem(AIRSPACE_CACHE_DATE_KEY);
-      const cachedPayload = localStorage.getItem(AIRSPACE_CACHE_KEY);
-      let useCache = false;
-
-      if (cachedDateStr && cachedPayload) {
-        const cachedDate = new Date(cachedDateStr);
-        const sameMonth = cachedDate.getFullYear() === today.getFullYear() && cachedDate.getMonth() === today.getMonth();
-        useCache = sameMonth && !isFirstOfMonth; // refresh on the 1st
-      }
-
-      if (useCache) {
-        try {
-          const parsed = JSON.parse(cachedPayload);
-          if (parsed?.airports && parsed?.waypoints) {
-            window.airspaceData = parsed;
-            console.info(`Airspace (cached): ${parsed.airports.length} airports, ${parsed.waypoints.length} waypoints`);
-            return;
-          }
-        } catch (e) {
-          // fall through to fetch
-        }
-      }
-
-      try {
-        const res = await fetch(AIRSPACE_URL, { cache: 'no-store' });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const xmlText = await res.text();
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(xmlText, 'text/xml');
-
-        const airports = [];
-        xml.querySelectorAll('Airport').forEach((node) => {
-          const name = node.getAttribute('Name') || node.getAttribute('ICAO') || node.getAttribute('IATA');
-          const id = node.getAttribute('ICAO') || node.getAttribute('IATA') || name;
-          const lat = parseFloat(node.getAttribute('Lat'));
-          const lon = parseFloat(node.getAttribute('Lon')) || parseFloat(node.getAttribute('Long'));
-          if (Number.isFinite(lat) && Number.isFinite(lon) && id) {
-            airports.push({ id, name: name || id, lat, lon, type: 'airport' });
-          }
-        });
-
-        const waypoints = [];
-        xml.querySelectorAll('Waypoint').forEach((node) => {
-          const id = node.getAttribute('Name') || node.getAttribute('ID') || node.getAttribute('Ident');
-          const lat = parseFloat(node.getAttribute('Lat'));
-          const lon = parseFloat(node.getAttribute('Lon')) || parseFloat(node.getAttribute('Long'));
-          if (Number.isFinite(lat) && Number.isFinite(lon) && id) {
-            waypoints.push({ id, name: id, lat, lon, type: 'waypoint' });
-          }
-        });
-
-        window.airspaceData = { airports, waypoints };
-        localStorage.setItem(AIRSPACE_CACHE_KEY, JSON.stringify(window.airspaceData));
-        localStorage.setItem(AIRSPACE_CACHE_DATE_KEY, today.toISOString());
-        console.info(`Airspace loaded fresh: ${airports.length} airports, ${waypoints.length} waypoints`);
-      } catch (err) {
-        console.error('Failed to load airspace data', err);
-      }
-    }
-
-    // Example hook for live QNH updates (MapLibre):
-    // updateQNHData({ 'AREA-10': { qnh: '1012', color: '#ffb703' } });
-    function updateQNHData(qnhByAreaCode) {
-      if (!areaGeoJSON) return;
-      let changed = false;
-      areaGeoJSON.features.forEach((f) => {
-        const code = f.properties?.area_code;
-        if (!code) return;
-        const data = qnhByAreaCode[code];
-        if (!data) return;
-        if (data.qnh) {
-          f.properties.qnh = data.qnh;
-          changed = true;
-        }
-        if (data.color) {
-          f.properties.color = data.color;
-          changed = true;
-        }
-      });
-      if (changed) {
-        const src = map.getSource('areas');
-        if (src) src.setData(areaGeoJSON);
-      }
     }
   </script>
 </body>
