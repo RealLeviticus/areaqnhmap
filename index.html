@@ -10,6 +10,9 @@
       --panel: #f7f7f7;
       --stroke: #d6d6d6;
       --label-red: #c40000;
+      --warn-bg: #fff4d7;
+      --warn-border: #f0c96a;
+      --warn-text: #7a5a05;
     }
     body {
       margin: 0;
@@ -43,6 +46,16 @@
       display: flex;
       flex-direction: column;
     }
+    #warning {
+      margin-bottom: 12px;
+      padding: 10px 12px;
+      border: 1px solid var(--warn-border);
+      border-radius: 10px;
+      background: var(--warn-bg);
+      color: var(--warn-text);
+      font-size: 0.95rem;
+      display: none;
+    }
     #map {
       width: 100%;
       height: 100%;
@@ -65,11 +78,19 @@
   </header>
 
   <main>
+    <div id="warning" role="status" aria-live="polite"></div>
     <div id="map" aria-label="Area QNH map"></div>
   </main>
 
   <script src="https://unpkg.com/maplibre-gl@3.5.2/dist/maplibre-gl.js"></script>
   <script>
+    const warningBox = document.getElementById('warning');
+    const showWarning = (message) => {
+      if (!message) return;
+      warningBox.textContent = message;
+      warningBox.style.display = 'block';
+    };
+
     const map = new maplibregl.Map({
       container: 'map',
       style: {
@@ -90,6 +111,17 @@
     });
 
     map.addControl(new maplibregl.NavigationControl(), 'top-left');
+
+    // Surface external dependency issues (tiles, glyphs) instead of silent blank map
+    map.on('error', (e) => {
+      const { resourceType, sourceId } = e || {};
+      if (resourceType === 'glyphs') {
+        showWarning('Map labels may be missing because glyphs could not be loaded (possible offline or blocked network).');
+      }
+      if (resourceType === 'tile' && sourceId === 'osm') {
+        showWarning('Base map tiles failed to load. Polygons will still render; check connectivity or tile access.');
+      }
+    });
 
     const QNH_WORKER_URL = 'https://areaqnh.therealleviticus.workers.dev/';
 
@@ -198,6 +230,7 @@
       } catch (err) {
         console.error('Failed to fetch/parse QNH', err);
         document.getElementById('validity').textContent = 'Failed to fetch QNH';
+        showWarning('QNH fetch failed – latest values unavailable.');
       }
     }
 
