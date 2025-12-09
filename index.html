@@ -133,7 +133,7 @@
           'text-field': [
             'format',
             ['to-string', ['coalesce', ['get', 'qnh'], '']],
-            { 'font-scale': 1.0, 'text-color': '#000' },
+            { 'font-scale': 1.0, 'text-color': '#000', 'font-weight': 'bold' },
             '\n',
             ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
             { 'font-scale': 0.7, 'text-color': '#c40000' }
