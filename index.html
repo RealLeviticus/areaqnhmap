@@ -118,47 +118,30 @@
         paint: { 'line-color': '#d40000', 'line-width': 2 }
       });
 
-      // QNH label (black) above
+      // Combined QNH + Area label
       map.addLayer({
-        id: 'areas-qnh',
+        id: 'areas-label',
         type: 'symbol',
         source: 'areas',
         layout: {
-          'text-field': ['to-string', ['coalesce', ['get', 'qnh'], '']],
+          'text-field': [
+            'format',
+            ['to-string', ['coalesce', ['get', 'qnh'], '']],
+            { 'font-scale': 1.0, 'text-color': '#000' },
+            '\n',
+            ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
+            { 'font-scale': 0.7, 'text-color': '#c40000' }
+          ],
           'text-font': ['Open Sans Regular'],
           'text-size': 18,
           'text-allow-overlap': true,
           'text-ignore-placement': true,
           'text-variable-anchor': ['center'],
-          'text-offset': [0, -0.9],
           'symbol-z-order': 'source'
         },
         paint: {
-          'text-color': '#000',
           'text-halo-color': '#fff',
-          'text-halo-width': 1.4
-        }
-      });
-
-      // Area label (red) below
-      map.addLayer({
-        id: 'areas-name',
-        type: 'symbol',
-        source: 'areas',
-        layout: {
-          'text-field': ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
-          'text-font': ['Open Sans Regular'],
-          'text-size': 11,
-          'text-allow-overlap': true,
-          'text-ignore-placement': true,
-          'text-variable-anchor': ['center'],
-          'text-offset': [0, 1.0],
-          'symbol-z-order': 'source'
-        },
-        paint: {
-          'text-color': '#c40000',
-          'text-halo-color': '#fff',
-          'text-halo-width': 1.0
+          'text-halo-width': 1.2
         }
       });
 
@@ -178,18 +161,17 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.text();
 
-        // --- CLEAN: keep line breaks, strip tags/scripts/styles, decode entities
+        // Clean HTML to plain text
         let text = raw
           .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
           .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
           .replace(/<br\s*\/?>/gi, '\n')
           .replace(/<\/(p|div|li|h\d|section)>/gi, '\n')
-          .replace(/<[^>]+>/g, ' ')           // tags -> space (not newline)
+          .replace(/<[^>]+>/g, ' ')
           .replace(/&nbsp;/g, ' ')
           .replace(/&amp;/g, '&')
           .replace(/&lt;/g, '<')
           .replace(/&gt;/g, '>')
-          // normalise whitespace but PRESERVE newlines:
           .replace(/[ \t]+\n/g, '\n')
           .replace(/\n[ \t]+/g, '\n')
           .replace(/\n{3,}/g, '\n\n')
@@ -199,9 +181,12 @@
         areaQnhMap = parsed.areaQnhMap;
         applyAreaQnhToPolygons();
 
-        // Compact validity header
         const v = parsed.validIssued;
-        validityBox.textContent = v ? `Valid: ${v.valid} · Issued: ${v.issued}` : 'Validity unknown';
+        const areaCount = Object.keys(parsed.areaQnhMap || {}).length;
+        const totalAreas = areaGeoJSON?.features?.length || '?';
+        validityBox.textContent = v
+          ? `Valid: ${v.valid} · Issued: ${v.issued} · Areas ${areaCount}/${totalAreas}`
+          : `Validity unknown · Areas ${areaCount}/${totalAreas}`;
       } catch (err) {
         console.error('Failed to fetch/parse QNH', err);
         document.getElementById('validity').textContent = 'Failed to fetch QNH';
@@ -209,41 +194,35 @@
     }
 
     function parseQNHText(text) {
-      // Split into real lines (we preserved newlines above)
       const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-
-      // Build blocks: "Area XX:" until the next "Area" or EOF or "Valid:"
       const blocks = [];
       let current = null;
       for (const line of lines) {
-        const m = line.match(/^(?:AREA|Area)\s*(\d+)\s*:/);
+        const m = line.match(/^(?:AREA|Area)\s*(\d+)\s*:(.*)$/);
         if (m) {
           if (current) blocks.push(current);
           current = { area: `AREA-${m[1]}`, lines: [] };
+          const rest = m[2]?.trim();
+          if (rest) current.lines.push(rest);
           continue;
         }
         if (/^Valid:/i.test(line) && current) {
           blocks.push(current);
           current = null;
-          // do not break; keep scanning to harvest later Valid/Issued occurrences
           continue;
         }
         if (current) current.lines.push(line);
       }
       if (current) blocks.push(current);
 
-      // Last 4-digit number per block is the QNH
       const areaQnhMapLocal = {};
       for (const b of blocks) {
         const txt = b.lines.join(' ');
-        const q = txt.match(/(\d{4})(?!.*\d{4})/);
-        const qnh = q ? Number(q[1]) : null;
-        if (qnh && qnh >= 900 && qnh <= 1050) {
-          areaQnhMapLocal[b.area] = { qnh };
-        }
+        const matches = [...txt.matchAll(/\b(\d{4})\b/g)].map(m => Number(m[1]));
+        const qnh = matches.find(n => n >= 900 && n <= 1050) ?? null;
+        if (qnh) areaQnhMapLocal[b.area] = { qnh };
       }
 
-      // Pull the last Valid / Issued in the entire text (there are several)
       const validAll = [...text.matchAll(/Valid:\s*([^\n]*?)(?=Issued:|\n|$)/gi)];
       const issuedAll = [...text.matchAll(/Issued:\s*([^\n]*)/gi)];
       const validIssued = (validAll.length && issuedAll.length)
