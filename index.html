@@ -74,7 +74,7 @@
       <h1>Area QNH Map</h1>
       <p class="sub">Replica of the BOM Area QNH Map removed from the new BOM website.</p>
     </div>
-    <div id="validity">Fetching QNH…</div>
+    <div id="validity">Fetching QNH</div>
   </header>
 
   <main>
@@ -91,20 +91,34 @@
       warningBox.style.display = 'block';
     };
 
+    const QNH_WORKER_URL = 'https://areaqnh.therealleviticus.workers.dev/';
+    const NAV_INDEX_URL = 'https://airspace.therealleviticus.workers.dev/';
+
+    // Inline GAF area polygons so the page works from file:// or any host
+    const AREA_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"area_code":"AREA-20","name":"QNH_AREA_20","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[148.383333,-32.75],[150.0,-29.0],[154.703056,-28.043611],[155.0,-28.833333],[152.666667,-34.333333],[151.177222,-33.946111],[150.988333,-33.924444],[149.651944,-33.409444],[148.383333,-32.75]]]}},{"type":"Feature","properties":{"area_code":"AREA-21","name":"QNH_AREA_21","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[146.924722,-36.195278],[148.383333,-32.75],[149.651944,-33.409444],[150.988333,-33.924444],[151.177222,-33.946111],[152.666667,-34.333333],[150.870556,-37.881111],[149.976111,-37.503889],[146.924722,-36.195278]]]}},{"type":"Feature","properties":{"area_code":"AREA-22","name":"QNH_AREA_22","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-29.0],[150.0,-29.0],[148.383333,-32.75],[146.924722,-36.195278],[141.0,-33.65],[141.0,-29.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-24","name":"QNH_AREA_24","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[152.666667,-34.333333],[155.0,-28.833333],[163.0,-28.5],[163.0,-31.333333],[152.666667,-34.333333]]]}},{"type":"Feature","properties":{"area_code":"AREA-30","name":"QNH_AREA_30","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-33.65],[146.924722,-36.195278],[149.976111,-37.503889],[150.870556,-37.881111],[150.2,-39.57],[142.8575,-39.57],[141.0,-39.57],[141.0,-33.65]]]}},{"type":"Feature","properties":{"area_code":"AREA-40","name":"QNH_AREA_40","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[147.820833,-23.156111],[152.864444,-23.155833],[154.703056,-28.043611],[150.0,-29.0],[148.183333,-23.566667],[147.820833,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-41","name":"QNH_AREA_41","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[138.0,-26.0],[138.0,-23.156111],[147.820833,-23.156111],[148.183333,-23.566667],[150.0,-29.0],[141.0,-29.0],[141.0,-26.0],[138.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-43","name":"QNH_AREA_43","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[138.0,-23.156111],[138.0,-19.0],[143.533333,-18.3],[147.820833,-23.156111],[138.0,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-44","name":"QNH_AREA_44","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[143.533333,-18.3],[148.0,-18.283333],[152.864444,-23.155833],[147.820833,-23.156111],[143.533333,-18.3]]]}},{"type":"Feature","properties":{"area_code":"AREA-45","name":"QNH_AREA_45","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-9.833333],[141.033333,-9.616667],[142.083333,-9.261667],[142.805,-9.323889],[143.875,-9.133333],[144.233333,-9.4],[144.089167,-9.942778],[144.026667,-11.5],[144.072222,-11.725],[144.0,-12.0],[147.607778,-16.995833],[148.0,-18.283333],[143.533333,-18.3],[138.0,-19.0],[138.0,-14.0],[141.0,-9.833333]]]}},{"type":"Feature","properties":{"area_code":"AREA-50","name":"QNH_AREA_50","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[134.5,-35.5],[135.372222,-34.686667],[137.716667,-32.5],[141.0,-33.65],[141.0,-39.57],[134.5,-35.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-51","name":"QNH_AREA_51","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[135.0,-30.0],[141.0,-29.0],[141.0,-33.65],[137.716667,-32.5],[135.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-52","name":"QNH_AREA_52","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-26.0],[138.0,-26.0],[141.0,-26.0],[141.0,-29.0],[135.0,-30.0],[129.0,-30.0],[129.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-53","name":"QNH_AREA_53","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-30.0],[135.0,-30.0],[137.716667,-32.5],[135.372222,-34.686667],[134.5,-35.5],[131.0,-32.5],[129.0,-33.0],[129.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-60","name":"QNH_AREA_60","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.5,-27.5],[118.0,-27.5],[119.0,-32.25],[113.5,-33.5],[112.5,-27.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-61","name":"QNH_AREA_61","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[119.0,-32.25],[118.0,-27.5],[123.5,-27.5],[123.618333,-30.84],[119.0,-32.25]]]}},{"type":"Feature","properties":{"area_code":"AREA-62","name":"QNH_AREA_62","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.618333,-30.84],[129.0,-30.0],[129.0,-33.0],[123.5,-35.0],[123.618333,-30.84]]]}},{"type":"Feature","properties":{"area_code":"AREA-63","name":"QNH_AREA_63","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[113.5,-33.5],[119.0,-32.25],[123.618333,-30.84],[123.5,-35.0],[116.0,-36.25],[113.5,-33.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-64","name":"QNH_AREA_64","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.5,-23.88],[129.0,-23.88],[129.0,-30.0],[123.618333,-30.84],[123.5,-27.5],[123.5,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-65","name":"QNH_AREA_65","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.096944,-23.88],[115.984722,-23.88],[118.0,-27.5],[112.5,-27.5],[112.096944,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-66","name":"QNH_AREA_66","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[115.984722,-23.88],[123.5,-23.88],[123.5,-27.5],[118.0,-27.5],[115.984722,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-68","name":"QNH_AREA_68","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.0,-23.0],[113.0,-21.0],[117.0,-18.0],[120.0,-18.0],[123.5,-20.5],[123.5,-23.88],[115.984722,-23.88],[112.096944,-23.88],[112.0,-23.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-69","name":"QNH_AREA_69","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[117.0,-18.0],[124.0,-14.0],[126.148056,-13.751667],[127.5,-14.0],[128.416667,-14.833333],[129.0,-14.879444],[129.0,-20.0],[123.5,-20.5],[120.0,-18.0],[117.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-70","name":"QNH_AREA_70","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[142.8575,-39.57],[150.2,-39.57],[149.0,-43.0],[147.5,-44.5],[145.0,-44.0],[142.8575,-39.57]]]}},{"type":"Feature","properties":{"area_code":"AREA-80","name":"QNH_AREA_80","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-9.409722],[141.0,-9.833333],[138.0,-14.0],[138.0,-19.0],[129.0,-15.884444],[129.0,-14.879444],[129.0,-9.409722]]]}},{"type":"Feature","properties":{"area_code":"AREA-83","name":"QNH_AREA_83","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.5,-20.5],[129.0,-20.0],[129.0,-23.88],[123.5,-23.88],[123.5,-20.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-84","name":"QNH_AREA_84","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-20.0],[129.0,-15.884444],[138.0,-19.0],[138.0,-23.156111],[129.0,-22.25],[129.0,-20.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-85","name":"QNH_AREA_85","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-23.88],[129.0,-22.25],[138.0,-23.156111],[138.0,-26.0],[129.0,-26.0],[129.0,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-86","name":"QNH_AREA_86","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[124.774444,-10.9125],[126.833333,-9.333333],[129.0,-9.409722],[129.0,-14.879444],[128.416667,-14.833333],[127.5,-14.0],[126.148056,-13.751667],[124.0,-14.0],[124.774444,-10.9125]]]}},{"type":"Feature","properties":{"area_code":"AREA-87","name":"QNH_AREA_87","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.0,-18.0],[118.0,-15.0],[124.0,-14.0],[117.0,-18.0],[112.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-88","name":"QNH_AREA_88","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[110.0,-19.0],[112.0,-18.0],[117.0,-18.0],[113.0,-21.0],[110.0,-19.0]]]}}]};
+
+    let areaGeoJSON = null;
+    let areaQnhMap = {};
+    let areaSplits = {};
+    let navPointMap = {};
+    let navIndexPromise = null;
+
     const map = new maplibregl.Map({
       container: 'map',
       style: {
         version: 8,
-        glyphs: 'https://fonts.openmaptiles.org/{fontstack}/{range}.pbf',
+        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
         sources: {
           osm: {
             type: 'raster',
             tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
             tileSize: 256,
-            attribution: '© OpenStreetMap contributors'
+            attribution: ' OpenStreetMap contributors'
           }
         },
-        layers: [{ id: 'osm-base', type: 'raster', source: 'osm' }]
+        layers: [{ id: 'osm-base', type: 'raster', source: 'osm' }],
+        // Use a font that is available on demotiles
+        "text-font": ["Noto Sans Regular"]
       },
       center: [134.5, -25.5],
       zoom: 3.6
@@ -123,16 +137,9 @@
       }
     });
 
-    const QNH_WORKER_URL = 'https://areaqnh.therealleviticus.workers.dev/';
-
-    // Inline GAF area polygons so the page works from file:// or any host
-    const AREA_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"area_code":"AREA-20","name":"QNH_AREA_20","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[148.383333,-32.75],[150.0,-29.0],[154.703056,-28.043611],[155.0,-28.833333],[152.666667,-34.333333],[151.177222,-33.946111],[150.988333,-33.924444],[149.651944,-33.409444],[148.383333,-32.75]]]}},{"type":"Feature","properties":{"area_code":"AREA-21","name":"QNH_AREA_21","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[146.924722,-36.195278],[148.383333,-32.75],[149.651944,-33.409444],[150.988333,-33.924444],[151.177222,-33.946111],[152.666667,-34.333333],[150.870556,-37.881111],[149.976111,-37.503889],[146.924722,-36.195278]]]}},{"type":"Feature","properties":{"area_code":"AREA-22","name":"QNH_AREA_22","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-29.0],[150.0,-29.0],[148.383333,-32.75],[146.924722,-36.195278],[141.0,-33.65],[141.0,-29.0]]]}} ,{"type":"Feature","properties":{"area_code":"AREA-24","name":"QNH_AREA_24","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[152.666667,-34.333333],[155.0,-28.833333],[163.0,-28.5],[163.0,-31.333333],[152.666667,-34.333333]]]}},{"type":"Feature","properties":{"area_code":"AREA-30","name":"QNH_AREA_30","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-33.65],[146.924722,-36.195278],[149.976111,-37.503889],[150.870556,-37.881111],[150.2,-39.57],[142.8575,-39.57],[141.0,-39.57],[141.0,-33.65]]]}},{"type":"Feature","properties":{"area_code":"AREA-40","name":"QNH_AREA_40","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[147.820833,-23.156111],[152.864444,-23.155833],[154.703056,-28.043611],[150.0,-29.0],[148.183333,-23.566667],[147.820833,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-41","name":"QNH_AREA_41","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[138.0,-26.0],[138.0,-23.156111],[147.820833,-23.156111],[148.183333,-23.566667],[150.0,-29.0],[141.0,-29.0],[141.0,-26.0],[138.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-43","name":"QNH_AREA_43","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[138.0,-23.156111],[138.0,-19.0],[143.533333,-18.3],[147.820833,-23.156111],[138.0,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-44","name":"QNH_AREA_44","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[143.533333,-18.3],[148.0,-18.283333],[152.864444,-23.155833],[147.820833,-23.156111],[143.533333,-18.3]]]}},{"type":"Feature","properties":{"area_code":"AREA-45","name":"QNH_AREA_45","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-9.833333],[141.033333,-9.616667],[142.083333,-9.261667],[142.805,-9.323889],[143.875,-9.133333],[144.233333,-9.4],[144.089167,-9.942778],[144.026667,-11.5],[144.072222,-11.725],[144.0,-12.0],[147.607778,-16.995833],[148.0,-18.283333],[143.533333,-18.3],[138.0,-19.0],[138.0,-14.0],[141.0,-9.833333]]]}},{"type":"Feature","properties":{"area_code":"AREA-50","name":"QNH_AREA_50","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[134.5,-35.5],[135.372222,-34.686667],[137.716667,-32.5],[141.0,-33.65],[141.0,-39.57],[134.5,-35.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-51","name":"QNH_AREA_51","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[135.0,-30.0],[141.0,-29.0],[141.0,-33.65],[137.716667,-32.5],[135.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-52","name":"QNH_AREA_52","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-26.0],[138.0,-26.0],[141.0,-26.0],[141.0,-29.0],[135.0,-30.0],[129.0,-30.0],[129.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-53","name":"QNH_AREA_53","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-30.0],[135.0,-30.0],[137.716667,-32.5],[135.372222,-34.686667],[134.5,-35.5],[131.0,-32.5],[129.0,-33.0],[129.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-60","name":"QNH_AREA_60","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.5,-27.5],[118.0,-27.5],[119.0,-32.25],[113.5,-33.5],[112.5,-27.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-61","name":"QNH_AREA_61","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[119.0,-32.25],[118.0,-27.5],[123.5,-27.5],[123.618333,-30.84],[119.0,-32.25]]]}},{"type":"Feature","properties":{"area_code":"AREA-62","name":"QNH_AREA_62","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.618333,-30.84],[129.0,-30.0],[129.0,-33.0],[123.5,-35.0],[123.618333,-30.84]]]}},{"type":"Feature","properties":{"area_code":"AREA-63","name":"QNH_AREA_63","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[113.5,-33.5],[119.0,-32.25],[123.618333,-30.84],[123.5,-35.0],[116.0,-36.25],[113.5,-33.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-64","name":"QNH_AREA_64","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.5,-23.88],[129.0,-23.88],[129.0,-30.0],[123.618333,-30.84],[123.5,-27.5],[123.5,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-65","name":"QNH_AREA_65","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.096944,-23.88],[115.984722,-23.88],[118.0,-27.5],[112.5,-27.5],[112.096944,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-66","name":"QNH_AREA_66","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[115.984722,-23.88],[123.5,-23.88],[123.5,-27.5],[118.0,-27.5],[115.984722,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-68","name":"QNH_AREA_68","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.0,-23.0],[113.0,-21.0],[117.0,-18.0],[120.0,-18.0],[123.5,-20.5],[123.5,-23.88],[115.984722,-23.88],[112.096944,-23.88],[112.0,-23.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-69","name":"QNH_AREA_69","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[117.0,-18.0],[124.0,-14.0],[126.148056,-13.751667],[127.5,-14.0],[128.416667,-14.833333],[129.0,-14.879444],[129.0,-20.0],[123.5,-20.5],[120.0,-18.0],[117.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-70","name":"QNH_AREA_70","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[142.8575,-39.57],[150.2,-39.57],[149.0,-43.0],[147.5,-44.5],[145.0,-44.0],[142.8575,-39.57]]]}},{"type":"Feature","properties":{"area_code":"AREA-80","name":"QNH_AREA_80","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-9.409722],[141.0,-9.833333],[138.0,-14.0],[138.0,-19.0],[129.0,-15.884444],[129.0,-14.879444],[129.0,-9.409722]]]}},{"type":"Feature","properties":{"area_code":"AREA-83","name":"QNH_AREA_83","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.5,-20.5],[129.0,-20.0],[129.0,-23.88],[123.5,-23.88],[123.5,-20.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-84","name":"QNH_AREA_84","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-20.0],[129.0,-15.884444],[138.0,-19.0],[138.0,-23.156111],[129.0,-22.25],[129.0,-20.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-85","name":"QNH_AREA_85","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-23.88],[129.0,-22.25],[138.0,-23.156111],[138.0,-26.0],[129.0,-26.0],[129.0,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-86","name":"QNH_AREA_86","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[124.774444,-10.9125],[126.833333,-9.333333],[129.0,-9.409722],[129.0,-14.879444],[128.416667,-14.833333],[127.5,-14.0],[126.148056,-13.751667],[124.0,-14.0],[124.774444,-10.9125]]]}},{"type":"Feature","properties":{"area_code":"AREA-87","name":"QNH_AREA_87","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.0,-18.0],[118.0,-15.0],[124.0,-14.0],[117.0,-18.0],[112.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-88","name":"QNH_AREA_88","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[110.0,-19.0],[112.0,-18.0],[117.0,-18.0],[113.0,-21.0],[110.0,-19.0]]]}}]};
-
-    let areaGeoJSON = null;
-    let areaQnhMap = {};
-
     map.on('load', () => {
       loadAreas();
+      ensureNavIndex();
       startQNHLoop();
     });
 
@@ -170,9 +177,9 @@
             { 'font-scale': 1.0, 'text-color': '#000', 'font-weight': 'bold' },
             '\n',
             ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
-            { 'font-scale': 0.7, 'text-color': '#c40000' }
+            { 'font-scale': 0.6, 'text-color': '#c40000' }
           ],
-          'text-font': ['Open Sans Regular'],
+          'text-font': ['Noto Sans Regular'],
           'text-size': 18,
           'text-allow-overlap': true,
           'text-ignore-placement': true,
@@ -205,7 +212,7 @@
         let text = raw
           .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
           .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<br\s*\/?/gi, '\n')
           .replace(/<\/(p|div|li|h\d|section)>/gi, '\n')
           .replace(/<[^>]+>/g, ' ')
           .replace(/&nbsp;/g, ' ')
@@ -219,18 +226,21 @@
 
         const parsed = parseQNHText(text);
         areaQnhMap = parsed.areaQnhMap;
+        areaSplits = parsed.areaSplits;
+        await ensureNavIndex();
         applyAreaQnhToPolygons();
+        drawGreenLines();
 
         const v = parsed.validIssued;
         const areaCount = Object.keys(parsed.areaQnhMap || {}).length;
         const totalAreas = areaGeoJSON?.features?.length || '?';
         validityBox.textContent = v
-          ? `Valid: ${v.valid} · Issued: ${v.issued} · Areas ${areaCount}/${totalAreas}`
-          : `Validity unknown · Areas ${areaCount}/${totalAreas}`;
+          ? `Valid: ${v.valid}  Issued: ${v.issued}  Areas ${areaCount}/${totalAreas}`
+          : `Validity unknown  Areas ${areaCount}/${totalAreas}`;
       } catch (err) {
         console.error('Failed to fetch/parse QNH', err);
         document.getElementById('validity').textContent = 'Failed to fetch QNH';
-        showWarning('QNH fetch failed – latest values unavailable.');
+        showWarning('QNH fetch failed  latest values unavailable.');
       }
     }
 
@@ -257,11 +267,46 @@
       if (current) blocks.push(current);
 
       const areaQnhMapLocal = {};
+      const areaSplitsLocal = {};
       for (const b of blocks) {
         const txt = b.lines.join(' ');
         const matches = [...txt.matchAll(/\b(\d{4})\b/g)].map(m => Number(m[1]));
         const qnh = matches.find(n => n >= 900 && n <= 1050) ?? null;
         if (qnh) areaQnhMapLocal[b.area] = { qnh };
+
+        // Find all BETWEEN ... AND ... #### splits, including those separated by commas
+        const splitRegex = /BETWEEN\s+([^,]+?)\s+AND\s+([^,]+?)\s+(\d{4})(?=[^\d]|$)/gi;
+        const splits = [];
+        let match;
+        while ((match = splitRegex.exec(txt)) !== null) {
+          // lhs and rhs may contain multiple points separated by / or ,
+          const lhs = match[1].replace(/[.,;]+$/g, '').trim();
+          const rhs = match[2].replace(/[.,;]+$/g, '').trim();
+          splits.push({
+            raw: match[0],
+            lhs,
+            rhs,
+            qnh: Number(match[3])
+          });
+        }
+
+        // ✅ NEW: Capture "E OF / W OF / N OF / S OF / NE/NW/SE/SW OF ..." boundaries as drawable lines too
+        const ofRegex = /\b(NW|NE|SW|SE|N|S|E|W)\s+OF\s+([^,]+?)\s+(\d{4})(?=[^\d]|$)/gi;
+        while ((match = ofRegex.exec(txt)) !== null) {
+          const dir = match[1].toUpperCase();
+          const lhs = match[2].replace(/[.,;]+$/g, '').trim();
+          splits.push({
+            raw: match[0],
+            lhs,
+            rhs: '',
+            dir,
+            qnh: Number(match[3])
+          });
+        }
+
+        if (splits.length) {
+          areaSplitsLocal[b.area] = splits;
+        }
       }
 
       const validAll = [...text.matchAll(/Valid:\s*([^\n]*?)(?=Issued:|\n|$)/gi)];
@@ -270,7 +315,303 @@
         ? { valid: validAll.at(-1)[1].trim(), issued: issuedAll.at(-1)[1].trim() }
         : null;
 
-      return { areaQnhMap: areaQnhMapLocal, validIssued };
+      return { areaQnhMap: areaQnhMapLocal, areaSplits: areaSplitsLocal, validIssued };
+    }
+
+    function ensureNavIndex() {
+      if (!navIndexPromise) navIndexPromise = fetchNavIndex();
+      return navIndexPromise;
+    }
+
+    async function fetchNavIndex() {
+      try {
+        // Always refetch so changing waypoints stay current
+        const res = await fetch(NAV_INDEX_URL + '?t=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) throw new Error(`Nav index HTTP ${res.status}`);
+        const xmlText = await res.text();
+        const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
+        navPointMap = {};
+        // Fixes
+        const points = doc.querySelectorAll('Point[Name]');
+        points.forEach((node) => {
+          const name = node.getAttribute('Name');
+          const raw = node.textContent?.trim();
+          const coord = parseAirspacePoint(raw);
+          if (name && coord) navPointMap[name.toUpperCase()] = coord;
+        });
+
+        // Airports (ICAO plus Name aliases)
+        const airports = doc.querySelectorAll('Airport[ICAO], Airport[Name], Airport[FullName], Airport[Position]');
+        airports.forEach((node) => {
+          const pos = node.getAttribute('Position') || node.textContent?.trim();
+          const coord = parseAirspacePoint(pos);
+          if (!coord) return;
+          const icao = node.getAttribute('ICAO');
+          const name = node.getAttribute('Name');
+          const full = node.getAttribute('FullName');
+          [icao, name, full].forEach(alias => {
+            if (alias) navPointMap[alias.toUpperCase()] = coord;
+          });
+        });
+        return navPointMap;
+      } catch (err) {
+        console.error('Failed to load nav index', err);
+        showWarning('Could not load nav index for green split lines.');
+        return navPointMap;
+      }
+    }
+
+    function parseAirspacePoint(raw) {
+      if (!raw) return null;
+      const parts = raw.split(/(?=[+-]\d)/).filter(Boolean);
+      if (parts.length !== 2) return null;
+      const lat = dmsStringToDecimal(parts[0]);
+      const lon = dmsStringToDecimal(parts[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+      return [lon, lat];
+    }
+
+    function dmsStringToDecimal(valStr) {
+      if (!valStr) return NaN;
+      const sign = valStr.trim().startsWith('-') ? -1 : 1;
+      const num = Math.abs(parseFloat(valStr));
+      const deg = Math.floor(num / 10000);
+      const rem = num - deg * 10000;
+      const min = Math.floor(rem / 100);
+      const sec = rem - min * 100;
+      return sign * (deg + min / 60 + sec / 3600);
+    }
+
+    function parseLatLonToken(token) {
+      const m = token.match(/^(\d{1,2})([NS])(\d{1,3})([EW])$/i);
+      if (!m) return null;
+      const latDeg = Number(m[1]);
+      const lonDeg = Number(m[3]);
+      const lat = (m[2].toUpperCase() === 'S' ? -1 : 1) * latDeg;
+      const lon = (m[4].toUpperCase() === 'W' ? -1 : 1) * lonDeg;
+      return [lon, lat];
+    }
+
+    function parseLatLonTokenWithMin(token) {
+      const m = token.match(/^(\d{1,2})(\d{2})([NS])(\d{1,3})(\d{2})([EW])$/i);
+      if (!m) return null;
+      const latDeg = Number(m[1]);
+      const latMin = Number(m[2]);
+      const lonDeg = Number(m[4]);
+      const lonMin = Number(m[5]);
+      const lat = (m[3].toUpperCase() === 'S' ? -1 : 1) * (latDeg + latMin / 60);
+      const lon = (m[6].toUpperCase() === 'W' ? -1 : 1) * (lonDeg + lonMin / 60);
+      return [lon, lat];
+    }
+
+    function resolveTokenToCoord(token) {
+      if (!token) return null;
+      const trimmed = token.trim();
+      const coordFromToken = parseLatLonToken(trimmed);
+      if (coordFromToken) return { coord: coordFromToken, name: trimmed.toUpperCase() };
+      const coordWithMin = parseLatLonTokenWithMin(trimmed);
+      if (coordWithMin) return { coord: coordWithMin, name: trimmed.toUpperCase() };
+      const lookup = navPointMap[trimmed.toUpperCase()];
+      return lookup ? { coord: lookup, name: trimmed.toUpperCase() } : null;
+    }
+
+    function tokenizeSplitSide(sideText) {
+      const skip = new Set(['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW', 'OF', 'TO', 'FROM']);
+      return sideText
+        .split(/[\/\s]+/)
+        .map(t => t.replace(/[.,;]+$/g, '').trim())
+        .filter(t => t && !skip.has(t.toUpperCase()));
+    }
+
+    function buildSplitPoints(split) {
+      // Accept tokens in order, including coordinates and ICAOs
+      // If split sides are separated by '/' or ',', treat each as a distinct point
+      const lhsTokens = split.lhs.split(/[\/|,]/).map(t => t.trim()).filter(Boolean);
+      const rhsTokens = split.rhs.split(/[\/|,]/).map(t => t.trim()).filter(Boolean);
+      const points = [];
+      lhsTokens.forEach(tok => {
+        const resolved = resolveTokenToCoord(tok);
+        if (resolved) {
+          points.push(resolved);
+        } else {
+          console.warn('Split token unresolved', tok);
+        }
+      });
+      rhsTokens.forEach(tok => {
+        const resolved = resolveTokenToCoord(tok);
+        if (resolved) {
+          points.push(resolved);
+        } else {
+          console.warn('Split token unresolved', tok);
+        }
+      });
+      return points;
+    }
+
+    // ✅ PATCHED: draw continuous polylines (and draw BOTH sides for BETWEEN)
+    function drawGreenLines() {
+      const lineFeatures = [];
+      const pointFeatures = [];
+      const labelFeatures = [];
+
+      const seenPoints = new Set();
+      const addPoint = (p, area) => {
+        if (!p) return;
+        const key = `${p.name}|${p.coord[0].toFixed(6)}|${p.coord[1].toFixed(6)}`;
+        if (seenPoints.has(key)) return;
+        seenPoints.add(key);
+        pointFeatures.push({
+          type: 'Feature',
+          properties: { area, name: p.name },
+          geometry: { type: 'Point', coordinates: p.coord }
+        });
+      };
+
+      const buildSide = (sideText) => {
+        if (!sideText) return [];
+        const toks = tokenizeSplitSide(sideText);
+        const pts = [];
+        toks.forEach(tok => {
+          const resolved = resolveTokenToCoord(tok);
+          if (resolved) pts.push(resolved);
+          else console.warn('Split token unresolved', tok);
+        });
+        return pts;
+      };
+
+      const addLine = (pts, props) => {
+        if (!pts || pts.length < 2) return;
+        lineFeatures.push({
+          type: 'Feature',
+          properties: props,
+          geometry: { type: 'LineString', coordinates: pts.map(p => p.coord) }
+        });
+      };
+
+      const addEndpointLabels = (pts, area, qnh) => {
+        if (!pts || pts.length < 2) return;
+        const first = pts[0];
+        const last = pts[pts.length - 1];
+        [ { p: first, offsetY: 0.9 }, { p: last, offsetY: -0.9 } ].forEach(({ p, offsetY }) => {
+          labelFeatures.push({
+            type: 'Feature',
+            properties: { area, qnh, offsetY },
+            geometry: { type: 'Point', coordinates: p.coord }
+          });
+        });
+      };
+
+      Object.entries(areaSplits || {}).forEach(([area, splits]) => {
+        splits.forEach(split => {
+          const lhsPts = buildSide(split.lhs);
+          const rhsPts = buildSide(split.rhs);
+
+          // Draw LHS polyline (continuous)
+          if (lhsPts.length >= 2) addLine(lhsPts, { area, qnh: split.qnh, side: 'lhs', raw: split.raw, dir: split.dir || '' });
+
+          // Draw RHS polyline (continuous) for BETWEEN only (when RHS exists)
+          if (rhsPts.length >= 2) addLine(rhsPts, { area, qnh: split.qnh, side: 'rhs', raw: split.raw, dir: split.dir || '' });
+
+          // Add crosses + point labels for every vertex we resolved
+          lhsPts.forEach(p => addPoint(p, area));
+          rhsPts.forEach(p => addPoint(p, area));
+
+          // Keep label behaviour close to your original: label endpoints for the "primary" line
+          // Prefer LHS, otherwise RHS.
+          if (lhsPts.length >= 2) addEndpointLabels(lhsPts, area, split.qnh);
+          else if (rhsPts.length >= 2) addEndpointLabels(rhsPts, area, split.qnh);
+        });
+      });
+
+      const lineFC = { type: 'FeatureCollection', features: lineFeatures };
+      const pointFC = { type: 'FeatureCollection', features: pointFeatures };
+      const labelFC = { type: 'FeatureCollection', features: labelFeatures };
+
+      const ensureSource = (id, data) => {
+        if (map.getSource(id)) {
+          map.getSource(id).setData(data);
+        } else {
+          map.addSource(id, { type: 'geojson', data });
+        }
+      };
+
+      ensureSource('qnh-split-lines', lineFC);
+      ensureSource('qnh-split-points', pointFC);
+      ensureSource('qnh-split-labels', labelFC);
+
+      if (!map.getLayer('qnh-split-lines')) {
+        map.addLayer({
+          id: 'qnh-split-lines',
+          type: 'line',
+          source: 'qnh-split-lines',
+          paint: {
+            'line-color': '#1f9e45',
+            'line-width': 3
+          }
+        });
+      }
+
+      if (!map.getLayer('qnh-split-points')) {
+        map.addLayer({
+          id: 'qnh-split-points',
+          type: 'symbol',
+          source: 'qnh-split-points',
+          layout: {
+            'text-field': 'x',
+            'text-size': 18,
+            'text-allow-overlap': true,
+            'symbol-z-order': 'source'
+          },
+          paint: {
+            'text-color': '#000000',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1
+          }
+        });
+      }
+
+      if (!map.getLayer('qnh-split-point-labels')) {
+        map.addLayer({
+          id: 'qnh-split-point-labels',
+          type: 'symbol',
+          source: 'qnh-split-points',
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-size': 7,
+            'text-allow-overlap': true,
+            'symbol-z-order': 'source',
+            'text-offset': [0.8, 0],
+            'text-anchor': 'left'
+          },
+          paint: {
+            'text-color': '#111111',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1
+          }
+        });
+      }
+
+      if (!map.getLayer('qnh-split-labels')) {
+        map.addLayer({
+          id: 'qnh-split-labels',
+          type: 'symbol',
+          source: 'qnh-split-labels',
+          layout: {
+            'text-field': ['to-string', ['get', 'qnh']],
+            'text-font': ['Noto Sans Regular'],
+            'text-size': 16,
+            'text-allow-overlap': true,
+            'symbol-z-order': 'source',
+            'text-offset': [0, ['get', 'offsetY']
+            ]
+          },
+          paint: {
+            'text-color': '#0a7e2f',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1.2
+          }
+        });
+      }
     }
 
     function applyAreaQnhToPolygons() {
