@@ -102,6 +102,9 @@
     let areaSplits = {};
     let navPointMap = {};
     let navIndexPromise = null;
+    let zoneFeatureIdCounter = 1;
+    let selectedZoneId = null;
+    let zoneClickBound = false;
 
     const map = new maplibregl.Map({
       container: 'map',
@@ -117,7 +120,6 @@
           }
         },
         layers: [{ id: 'osm-base', type: 'raster', source: 'osm' }],
-        // Use a font that is available on demotiles
         "text-font": ["Noto Sans Regular"]
       },
       center: [134.5, -25.5],
@@ -126,14 +128,13 @@
 
     map.addControl(new maplibregl.NavigationControl(), 'top-left');
 
-    // Surface external dependency issues (tiles, glyphs) instead of silent blank map
     map.on('error', (e) => {
       const { resourceType, sourceId } = e || {};
       if (resourceType === 'glyphs') {
         showWarning('Map labels may be missing because glyphs could not be loaded (possible offline or blocked network).');
       }
       if (resourceType === 'tile' && sourceId === 'osm') {
-        showWarning('Base map tiles failed to load. Polygons will still render; check connectivity or tile access.');
+        showWarning('Base map tiles failed to load. Polygons will still render, check connectivity or tile access.');
       }
     });
 
@@ -144,7 +145,6 @@
     });
 
     async function loadAreas() {
-      // Clone so we can mutate qnh per feature without touching the constant
       const geojson = JSON.parse(JSON.stringify(AREA_DATA));
       geojson.features.forEach((f, i) => f.id = i + 1);
       areaGeoJSON = geojson;
@@ -165,7 +165,6 @@
         paint: { 'line-color': '#d40000', 'line-width': 2 }
       });
 
-      // Combined QNH + Area label
       map.addLayer({
         id: 'areas-label',
         type: 'symbol',
@@ -174,7 +173,7 @@
           'text-field': [
             'format',
             ['to-string', ['coalesce', ['get', 'qnh'], '']],
-            { 'font-scale': 1.0, 'text-color': '#000', 'font-weight': 'bold' },
+            { 'font-scale': 1.0, 'text-color': '#000' },
             '\n',
             ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
             { 'font-scale': 0.7, 'text-color': '#c40000' }
@@ -196,6 +195,54 @@
       fitToAreas(geojson);
     }
 
+    function applyAreaQnhToPolygons() {
+      if (!areaGeoJSON || !areaGeoJSON.features) return;
+      const qnhMap = areaQnhMap || {};
+
+      areaGeoJSON.features.forEach((feature) => {
+        const code = (feature.properties?.area_code || '').toUpperCase();
+        const entry = qnhMap[code];
+        feature.properties.qnh = entry ? entry.qnh : null;
+      });
+
+      const source = map.getSource && map.getSource('areas');
+      if (source && source.setData) {
+        source.setData(areaGeoJSON);
+      }
+    }
+
+    function fitToAreas(geojson) {
+      const features = geojson?.features;
+      if (!features || !features.length || !map || typeof map.fitBounds !== 'function') return;
+
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+
+      const add = (coord) => {
+        if (!Array.isArray(coord) || coord.length < 2) return;
+        const [x, y] = coord;
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      };
+
+      const walk = (coords) => {
+        if (!Array.isArray(coords)) return;
+        if (typeof coords[0] === 'number') {
+          add(coords);
+          return;
+        }
+        coords.forEach(walk);
+      };
+
+      features.forEach(f => walk(f.geometry?.coordinates));
+      if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return;
+
+      const bounds = new maplibregl.LngLatBounds([minX, minY], [maxX, maxY]);
+      map.fitBounds(bounds, { padding: 24, maxZoom: 6, duration: 400 });
+    }
+
     function startQNHLoop() {
       fetchAndDrawQNH();
       setInterval(fetchAndDrawQNH, 15 * 60 * 1000);
@@ -208,7 +255,6 @@
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.text();
 
-        // Clean HTML to plain text
         let text = raw
           .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
           .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
@@ -270,16 +316,12 @@
       const areaSplitsLocal = {};
       for (const b of blocks) {
         const txt = b.lines.join(' ');
-
-        // Base/overall QNH (used for areas without split rules)
         const matches = [...txt.matchAll(/\b(\d{4})\b/g)].map(m => Number(m[1]));
         const qnh = matches.find(n => n >= 900 && n <= 1050) ?? null;
         if (qnh) areaQnhMapLocal[b.area] = { qnh };
 
-        // Split rules
         const rules = [];
 
-        // BETWEEN ... AND ... ####
         const betweenRegex = /BETWEEN\s+([^,]+?)\s+AND\s+([^,]+?)\s+(\d{4})(?=[^\d]|$)/gi;
         let match;
         while ((match = betweenRegex.exec(txt)) !== null) {
@@ -292,7 +334,6 @@
           });
         }
 
-        // Directional "E OF ... 1016" / "NE OF ... 1013" etc
         const ofRegex = /\b(NW|NE|SW|SE|N|S|E|W)\s+OF\s+([^,]+?)\s+(\d{4})(?=[^\d]|$)/gi;
         while ((match = ofRegex.exec(txt)) !== null) {
           rules.push({
@@ -305,7 +346,6 @@
           });
         }
 
-        // REST ####
         const restRegex = /\bREST\s+(\d{4})(?=[^\d]|$)/gi;
         while ((match = restRegex.exec(txt)) !== null) {
           rules.push({
@@ -336,13 +376,12 @@
 
     async function fetchNavIndex() {
       try {
-        // Always refetch so changing waypoints stay current
         const res = await fetch(NAV_INDEX_URL + '?t=' + Date.now(), { cache: 'no-store' });
         if (!res.ok) throw new Error(`Nav index HTTP ${res.status}`);
         const xmlText = await res.text();
         const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
         navPointMap = {};
-        // Fixes
+
         const points = doc.querySelectorAll('Point[Name]');
         points.forEach((node) => {
           const name = node.getAttribute('Name');
@@ -351,7 +390,6 @@
           if (name && coord) navPointMap[name.toUpperCase()] = coord;
         });
 
-        // Airports (ICAO plus Name aliases)
         const airports = doc.querySelectorAll('Airport[ICAO], Airport[Name], Airport[FullName], Airport[Position]');
         airports.forEach((node) => {
           const pos = node.getAttribute('Position') || node.textContent?.trim();
@@ -364,6 +402,7 @@
             if (alias) navPointMap[alias.toUpperCase()] = coord;
           });
         });
+
         return navPointMap;
       } catch (err) {
         console.error('Failed to load nav index', err);
@@ -434,19 +473,13 @@
         .filter(t => t && !skip.has(t.toUpperCase()));
     }
 
-    // -------------------------
-    // GREEN LINE PATCHES START
-    // -------------------------
-
-    // Controls: extend start/end of polylines to red borders.
-    // You asked for extending to borders; leaving both on produces the BOM-style full boundary lines.
     const EXTEND_SPLIT_LINE_START = true;
     const EXTEND_SPLIT_LINE_END = true;
 
     const EPS = 1e-10;
+    const MIN_RING_AREA = 1e-9;
 
     function pointInPolygon(point, ring) {
-      // Ray casting algorithm
       const x = point[0], y = point[1];
       let inside = false;
       for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
@@ -459,8 +492,115 @@
       return inside;
     }
 
+    function pointInPolygonWithHoles(point, polyObj) {
+      if (!polyObj) return false;
+      const outer = polyObj.outer || polyObj;
+      const holes = polyObj.holes || [];
+      if (!pointInPolygon(point, outer)) return false;
+      return !holes.some(h => pointInPolygon(point, h));
+    }
+
+    function ringSignedArea(ring) {
+      if (!ring || ring.length < 3) return 0;
+      let area = 0;
+      for (let i = 0; i < ring.length - 1; i++) {
+        const [x1, y1] = ring[i];
+        const [x2, y2] = ring[i + 1];
+        area += x1 * y2 - x2 * y1;
+      }
+      return area / 2;
+    }
+
+    function ensureClosedRing(ring) {
+      if (!ring || !ring.length) return [];
+      const closed = ring.slice();
+      const first = closed[0];
+      const last = closed[closed.length - 1];
+      if (Math.abs(first[0] - last[0]) > EPS || Math.abs(first[1] - last[1]) > EPS) {
+        closed.push([first[0], first[1]]);
+      }
+      return closed;
+    }
+
+    function sanitizeRing(ring) {
+      const closed = ensureClosedRing(ring || []);
+      if (closed.length < 4) return [];
+      const dedup = [closed[0]];
+      for (let i = 1; i < closed.length; i++) {
+        const p = closed[i];
+        const prev = dedup[dedup.length - 1];
+        if (Math.hypot(p[0] - prev[0], p[1] - prev[1]) > 1e-12) dedup.push(p);
+      }
+      const finalRing = ensureClosedRing(dedup);
+      const area = Math.abs(ringSignedArea(finalRing));
+      return (finalRing.length >= 4 && area > MIN_RING_AREA) ? finalRing : [];
+    }
+
+    function polygonKey(ring) {
+      const oriented = orientRing(sanitizeRing(ring), false);
+      if (!oriented.length) return '';
+      const pts = oriented.slice(0, -1); // drop closing duplicate for key
+      let start = 0;
+      for (let i = 1; i < pts.length; i++) {
+        const a = pts[i], b = pts[start];
+        if (a[0] < b[0] - 1e-9 || (Math.abs(a[0] - b[0]) < 1e-9 && a[1] < b[1] - 1e-9)) start = i;
+      }
+      const ordered = [];
+      for (let i = 0; i < pts.length; i++) {
+        ordered.push(pts[(start + i) % pts.length]);
+      }
+      return ordered.map(p => `${p[0].toFixed(6)},${p[1].toFixed(6)}`).join('|');
+    }
+
+    function polylineSideMatches(pt, coords, samplePoint) {
+      if (!coords || coords.length < 2 || !samplePoint) return false;
+      const sp = samplePoint;
+      for (let i = 0; i < coords.length - 1; i++) {
+        const a = coords[i];
+        const b = coords[i + 1];
+        const keepPositive = signedSide(sp, a, b) >= 0;
+        const side = signedSide(pt, a, b);
+        if (keepPositive ? side < -EPS : side > EPS) return false;
+      }
+      return true;
+    }
+
+    function orientRing(ring, clockwise = false) {
+      const closed = ensureClosedRing(ring);
+      const area = ringSignedArea(closed);
+      const isClockwise = area < 0;
+      if (clockwise === isClockwise) return closed;
+      const body = closed.slice(0, -1).reverse();
+      return ensureClosedRing(body);
+    }
+
+    function safeInteriorPoint(ring) {
+      if (!ring || ring.length < 3) return null;
+      const best = bestInteriorPoint(ring, null);
+      if (best) return best;
+      const c = polygonCentroid(ring);
+      return pushInsidePolygon(c, ring, c);
+    }
+
+    // Build planar faces from segments covering an area ring
+    // Faces/planar subdivision removed; only green line rendering remains
+
+    function signedSide(p, a, b) {
+      return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+    }
+
+    function intersectSegmentWithLine(p1, p2, a, b) {
+      const r = [p2[0] - p1[0], p2[1] - p1[1]];
+      const s = [b[0] - a[0], b[1] - a[1]];
+      const denom = r[0] * s[1] - r[1] * s[0];
+      if (Math.abs(denom) < EPS) return null;
+      const qp = [a[0] - p1[0], a[1] - p1[1]];
+      const t = (qp[0] * s[1] - qp[1] * s[0]) / denom;
+      if (t < -EPS || t > 1 + EPS) return null;
+      return [p1[0] + t * r[0], p1[1] + t * r[1]];
+    }
+
     function segIntersect(p, p2, q, q2) {
-      // Segment intersection in 2D; returns {t,u,pt} where pt = p + t*(p2-p)
       const r = [p2[0] - p[0], p2[1] - p[1]];
       const s = [q2[0] - q[0], q2[1] - q[1]];
       const denom = r[0] * s[1] - r[1] * s[0];
@@ -474,7 +614,6 @@
     }
 
     function rayIntersectPolygon(origin, dir, ring) {
-      // Find nearest intersection of ray origin + t*dir (t>0) with polygon edges
       const far = [origin[0] + dir[0] * 1e6, origin[1] + dir[1] * 1e6];
       let bestT = Infinity;
       let best = null;
@@ -483,7 +622,9 @@
         const b = ring[i + 1];
         const hit = segIntersect(origin, far, a, b);
         if (!hit) continue;
-        if (hit.t > 1e-9 && hit.t < bestT) {
+
+        // Tightened threshold so we do not skip legitimate border hits near the start point
+        if (hit.t > 1e-12 && hit.t < bestT) {
           bestT = hit.t;
           best = hit.pt;
         }
@@ -492,7 +633,6 @@
     }
 
     function clipSegmentToPolygon(p1, p2, ring) {
-      // Returns array of LineString coordinate pairs inside polygon
       const pts = [{ t: 0, pt: p1 }, { t: 1, pt: p2 }];
       for (let i = 0; i < ring.length - 1; i++) {
         const a = ring[i];
@@ -504,7 +644,6 @@
         }
       }
 
-      // De-dupe by t
       pts.sort((x, y) => x.t - y.t);
       const dedup = [];
       for (const p of pts) {
@@ -526,7 +665,6 @@
     }
 
     function clipPolylineToPolygon(coords, ring) {
-      // Returns array of LineString segments (each is array of coords)
       const out = [];
       for (let i = 0; i < coords.length - 1; i++) {
         const p1 = coords[i];
@@ -552,9 +690,7 @@
         const b = extended[1];
         const dir = normalise([a[0] - b[0], a[1] - b[1]]);
         const hit = rayIntersectPolygon(a, dir, ring);
-        if (hit) {
-          extended.unshift(hit);
-        }
+        if (hit) extended.unshift(hit);
       }
 
       if (EXTEND_SPLIT_LINE_END) {
@@ -563,16 +699,13 @@
         const b = extended[n - 1];
         const dir = normalise([b[0] - a[0], b[1] - a[1]]);
         const hit = rayIntersectPolygon(b, dir, ring);
-        if (hit) {
-          extended.push(hit);
-        }
+        if (hit) extended.push(hit);
       }
 
       return extended;
     }
 
     function polygonCentroid(ring) {
-      // Simple polygon centroid (assumes closed ring)
       let area = 0;
       let cx = 0;
       let cy = 0;
@@ -586,7 +719,6 @@
       }
       area *= 0.5;
       if (Math.abs(area) < EPS) {
-        // fallback: average
         const xs = ring.map(p => p[0]);
         const ys = ring.map(p => p[1]);
         return [xs.reduce((s, v) => s + v, 0) / xs.length, ys.reduce((s, v) => s + v, 0) / ys.length];
@@ -596,22 +728,7 @@
       return [cx, cy];
     }
 
-    function midPointOfCoords(coords) {
-      if (!coords || !coords.length) return null;
-      const mid = coords[Math.floor(coords.length / 2)];
-      return mid ? [mid[0], mid[1]] : null;
-    }
-
-    function offsetByDir(pt, dir, magnitudeDeg) {
-      const d = dir.toUpperCase();
-      const dx = (d.includes('E') ? 1 : 0) - (d.includes('W') ? 1 : 0);
-      const dy = (d.includes('N') ? 1 : 0) - (d.includes('S') ? 1 : 0);
-      const v = normalise([dx, dy]);
-      return [pt[0] + v[0] * magnitudeDeg, pt[1] + v[1] * magnitudeDeg];
-    }
-
     function pushInsidePolygon(candidate, ring, fallback) {
-      // If candidate is outside polygon, walk back towards fallback
       if (pointInPolygon(candidate, ring)) return candidate;
       const steps = 20;
       for (let i = 1; i <= steps; i++) {
@@ -620,113 +737,6 @@
         if (pointInPolygon(p, ring)) return p;
       }
       return fallback;
-    }
-
-    function ensureClosedRing(ring) {
-      if (!ring || !ring.length) return [];
-      const closed = ring.slice();
-      const first = closed[0];
-      const last = closed[closed.length - 1];
-      if (Math.abs(first[0] - last[0]) > EPS || Math.abs(first[1] - last[1]) > EPS) {
-        closed.push([first[0], first[1]]);
-      }
-      return closed;
-    }
-
-    function dirToVector(dir) {
-      const d = (dir || '').toUpperCase();
-      const dx = (d.includes('E') ? 1 : 0) - (d.includes('W') ? 1 : 0);
-      const dy = (d.includes('N') ? 1 : 0) - (d.includes('S') ? 1 : 0);
-      const v = normalise([dx, dy]);
-      return (Math.abs(v[0]) < EPS && Math.abs(v[1]) < EPS) ? [1, 0] : v;
-    }
-
-    function signedSide(p, a, b) {
-      // Positive means p is to the left of a->b
-      return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
-    }
-
-    function intersectSegmentWithLine(p1, p2, a, b) {
-      // Intersection of segment p1->p2 with infinite line a->b
-      const r = [p2[0] - p1[0], p2[1] - p1[1]];
-      const s = [b[0] - a[0], b[1] - a[1]];
-      const denom = r[0] * s[1] - r[1] * s[0];
-      if (Math.abs(denom) < EPS) return null;
-      const qp = [a[0] - p1[0], a[1] - p1[1]];
-      const t = (qp[0] * s[1] - qp[1] * s[0]) / denom;
-      if (t < -EPS || t > 1 + EPS) return null;
-      return [p1[0] + t * r[0], p1[1] + t * r[1]];
-    }
-
-    function clipPolygonWithLine(ring, a, b, keepPositive = true) {
-      // Sutherland–Hodgman against a single infinite line
-      const closed = ensureClosedRing(ring);
-      if (closed.length < 3) return [];
-      const out = [];
-      for (let i = 0; i < closed.length - 1; i++) {
-        const p1 = closed[i];
-        const p2 = closed[i + 1];
-        const d1 = signedSide(p1, a, b);
-        const d2 = signedSide(p2, a, b);
-        const inside1 = keepPositive ? d1 >= -EPS : d1 <= EPS;
-        const inside2 = keepPositive ? d2 >= -EPS : d2 <= EPS;
-
-        if (inside1 && inside2) {
-          out.push(p2);
-        } else if (inside1 && !inside2) {
-          const hit = intersectSegmentWithLine(p1, p2, a, b);
-          if (hit) out.push(hit);
-        } else if (!inside1 && inside2) {
-          const hit = intersectSegmentWithLine(p1, p2, a, b);
-          if (hit) out.push(hit);
-          out.push(p2);
-        }
-      }
-
-      if (out.length) {
-        const first = out[0];
-        const last = out[out.length - 1];
-        if (Math.abs(first[0] - last[0]) > EPS || Math.abs(first[1] - last[1]) > EPS) {
-          out.push([first[0], first[1]]);
-        }
-      }
-      return out;
-    }
-
-    function clipPolygonWithPolyline(ring, coords, dirVec) {
-      // Clip polygon to the named side of each segment in the polyline
-      if (!coords || coords.length < 2) return [];
-      let poly = ensureClosedRing(ring);
-      const v = dirVec || [1, 0];
-      for (let i = 0; i < coords.length - 1; i++) {
-        const a = coords[i];
-        const b = coords[i + 1];
-        const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-        const ref = [mid[0] + v[0], mid[1] + v[1]];
-        const keepPositive = signedSide(ref, a, b) >= 0;
-        poly = clipPolygonWithLine(poly, a, b, keepPositive);
-        if (!poly.length) break;
-      }
-      return poly;
-    }
-
-    function clipPolygonToSideOfPolyline(ring, coords, samplePoint) {
-      // Keep the side of each segment that contains samplePoint
-      if (!coords || coords.length < 2 || !samplePoint) return [];
-      let poly = ensureClosedRing(ring);
-      const safeSample = pushInsidePolygon(samplePoint, ring, polygonCentroid(ring));
-      for (let i = 0; i < coords.length - 1; i++) {
-        const a = coords[i];
-        const b = coords[i + 1];
-        const keepPositive = signedSide(safeSample, a, b) >= 0;
-        poly = clipPolygonWithLine(poly, a, b, keepPositive);
-        if (!poly.length) break;
-      }
-      return poly;
-    }
-
-    function pointInAnyPolygon(pt, polygons) {
-      return polygons.some(poly => pointInPolygon(pt, poly));
     }
 
     function ringBounds(ring) {
@@ -740,9 +750,13 @@
       return { minX, minY, maxX, maxY };
     }
 
-    function offsetFromCentroid(ring, dirVec, scale = 1) {
-      const c = polygonCentroid(ring);
-      return [c[0] + dirVec[0] * scale, c[1] + dirVec[1] * scale];
+    function getRingBBox(ring) {
+      if (!ring || !ring.length) return { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+      return ringBounds(ring);
+    }
+
+    function pointInAnyPolygon(pt, polygons) {
+      return polygons.some(poly => pointInPolygon(pt, poly));
     }
 
     function pointSegDist(p, a, b) {
@@ -815,22 +829,142 @@
         }
       }
 
-      if (best && (!avoidPolys || !pointInAnyPolygon(best, avoidPolys))) {
-        return best;
-      }
+      if (best && (!avoidPolys || !pointInAnyPolygon(best, avoidPolys))) return best;
       return null;
     }
 
-    function pointOnSameSideAsSample(pt, coords, sample) {
-      if (!coords || coords.length < 2 || !sample) return true;
+    function clipPolygonToPolygon(subjectRing, clipRing) {
+      let output = ensureClosedRing(subjectRing);
+      const clip = ensureClosedRing(clipRing);
+      if (output.length < 3 || clip.length < 3) return [];
+
+      const clipArea = ringSignedArea(clip);
+      const clipCCW = clipArea > 0;
+
+      for (let i = 0; i < clip.length - 1; i++) {
+        const a = clip[i];
+        const b = clip[i + 1];
+        const keepPositive = (p) => {
+          const side = signedSide(p, a, b);
+          return clipCCW ? side >= -EPS : side <= EPS;
+        };
+
+        const input = output.slice();
+        output = [];
+        if (!input.length) break;
+
+        for (let j = 0; j < input.length - 1; j++) {
+          const current = input[j];
+          const next = input[j + 1];
+          const currentInside = keepPositive(current);
+          const nextInside = keepPositive(next);
+
+          if (currentInside && nextInside) {
+            output.push(next);
+          } else if (currentInside && !nextInside) {
+            const hit = intersectSegmentWithLine(current, next, a, b);
+            if (hit) output.push(hit);
+          } else if (!currentInside && nextInside) {
+            const hit = intersectSegmentWithLine(current, next, a, b);
+            if (hit) output.push(hit);
+            output.push(next);
+          }
+        }
+        if (output.length) {
+          const first = output[0];
+          const last = output[output.length - 1];
+          if (Math.abs(first[0] - last[0]) > EPS || Math.abs(first[1] - last[1]) > EPS) {
+            output.push([first[0], first[1]]);
+          }
+        }
+      }
+
+      return output;
+    }
+
+    function clipPolygonWithLine(ring, a, b, keepPositive = true) {
+      const closed = ensureClosedRing(ring);
+      if (closed.length < 3) return [];
+      const out = [];
+      for (let i = 0; i < closed.length - 1; i++) {
+        const p1 = closed[i];
+        const p2 = closed[i + 1];
+        const d1 = signedSide(p1, a, b);
+        const d2 = signedSide(p2, a, b);
+        const inside1 = keepPositive ? d1 >= -EPS : d1 <= EPS;
+        const inside2 = keepPositive ? d2 >= -EPS : d2 <= EPS;
+
+        if (inside1 && inside2) {
+          out.push(p2);
+        } else if (inside1 && !inside2) {
+          const hit = intersectSegmentWithLine(p1, p2, a, b);
+          if (hit) out.push(hit);
+        } else if (!inside1 && inside2) {
+          const hit = intersectSegmentWithLine(p1, p2, a, b);
+          if (hit) out.push(hit);
+          out.push(p2);
+        }
+      }
+
+      if (out.length) {
+        const first = out[0];
+        const last = out[out.length - 1];
+        if (Math.abs(first[0] - last[0]) > EPS || Math.abs(first[1] - last[1]) > EPS) {
+          out.push([first[0], first[1]]);
+        }
+      }
+      return out;
+    }
+
+    function clipPolygonToSideOfPolyline(ring, coords, samplePoint) {
+      if (!coords || coords.length < 2 || !samplePoint) return [];
+      let poly = ensureClosedRing(ring);
+      const safeSample = pushInsidePolygon(samplePoint, ring, polygonCentroid(ring));
       for (let i = 0; i < coords.length - 1; i++) {
         const a = coords[i];
         const b = coords[i + 1];
-        const keepPositive = signedSide(sample, a, b) >= 0;
-        const side = signedSide(pt, a, b);
-        if (keepPositive ? side < -EPS : side > EPS) return false;
+        const keepPositive = signedSide(safeSample, a, b) >= 0;
+        poly = clipPolygonWithLine(poly, a, b, keepPositive);
+        if (!poly.length) break;
       }
-      return true;
+      return poly;
+    }
+
+    function dirToVector(dir) {
+      const d = (dir || '').toUpperCase();
+      const dx = (d.includes('E') ? 1 : 0) - (d.includes('W') ? 1 : 0);
+      const dy = (d.includes('N') ? 1 : 0) - (d.includes('S') ? 1 : 0);
+      const v = normalise([dx, dy]);
+      return (Math.abs(v[0]) < EPS && Math.abs(v[1]) < EPS) ? [1, 0] : v;
+    }
+
+    function midPointOfCoords(coords) {
+      if (!coords || !coords.length) return null;
+      const mid = coords[Math.floor(coords.length / 2)];
+      return mid ? [mid[0], mid[1]] : null;
+    }
+
+    function ringsIntersect(r1, r2) {
+      if (!r1 || !r2 || r1.length < 2 || r2.length < 2) return false;
+      const a = ensureClosedRing(r1);
+      const b = ensureClosedRing(r2);
+      for (let i = 0; i < a.length - 1; i++) {
+        const p1 = a[i], p2 = a[i + 1];
+        for (let j = 0; j < b.length - 1; j++) {
+          const q1 = b[j], q2 = b[j + 1];
+          const hit = segIntersect(p1, p2, q1, q2);
+          if (hit) return true;
+        }
+      }
+      return false;
+    }
+
+    function ringTouchesOrInside(outer, ring) {
+      const closedOuter = ensureClosedRing(outer);
+      const closedRing = ensureClosedRing(ring);
+      if (closedRing.some(pt => pointInPolygon(pt, closedOuter))) return true;
+      if (ringsIntersect(closedOuter, closedRing)) return true;
+      return false;
     }
 
     function bestInteriorPointWithPredicate(ring, avoidPolys, predicate) {
@@ -871,26 +1005,32 @@
       return best;
     }
 
-    function makeTinyBox(pt, sizeDeg = 0.1) {
-      if (!pt) return null;
-      const [x, y] = pt;
-      return ensureClosedRing([
-        [x - sizeDeg, y - sizeDeg],
-        [x + sizeDeg, y - sizeDeg],
-        [x + sizeDeg, y + sizeDeg],
-        [x - sizeDeg, y + sizeDeg]
-      ]);
-    }
+    function computeRestPolygons(ring, occupiedPolys) {
+      const outer = sanitizeRing(ring);
+      const holes = [];
+      (occupiedPolys || []).forEach(poly => {
+        const clean = sanitizeRing(poly);
+        if (!clean.length) return;
+        const clipped = clipPolygonToPolygon(clean, outer);
+        const clippedClean = sanitizeRing(clipped);
+        if (!clippedClean.length) return;
+        const hole = orientRing(clippedClean, true);
+        if (ringTouchesOrInside(outer, hole)) holes.push(hole);
+      });
 
-    function ensurePointOnSide(pt, coords, sample, ring) {
-      if (!pt) return null;
-      if (pointOnSameSideAsSample(pt, coords, sample)) return pt;
-      const safe = pushInsidePolygon(sample || pt, ring, polygonCentroid(ring));
-      return pointOnSameSideAsSample(safe, coords, sample) ? safe : null;
+      const orientedOuter = orientRing(outer, false);
+
+      const labelPoint = bestInteriorPointWithPredicate(
+        orientedOuter,
+        holes,
+        (p) => !pointInAnyPolygon(p, holes)
+      ) || polygonCentroid(orientedOuter);
+
+      const polyObj = { outer: orientedOuter, holes };
+      return { polys: [polyObj], labelPoint };
     }
 
     function findOpenPointInRing(ring, avoidPolys, fallback) {
-      // Find a point inside ring but outside any avoidPolys
       const centroid = polygonCentroid(ring);
       const base = fallback || centroid;
       const bounds = ringBounds(ring);
@@ -927,9 +1067,20 @@
     function drawGreenLines() {
       const lineFeatures = [];
       const pointFeatures = [];
-      const labelFeatures = []; // kept for backwards compatibility (endpoint qnh labels)
+      const labelFeatures = [];
       const zoneLabelFeatures = [];
+      const zoneFillFeatures = [];
       const zonePolygons = [];
+
+      if (selectedZoneId !== null && map.getSource('qnh-zone-fills')) {
+        if (map.removeFeatureState) {
+          map.removeFeatureState({ source: 'qnh-zone-fills', id: selectedZoneId });
+        } else {
+          map.setFeatureState({ source: 'qnh-zone-fills', id: selectedZoneId }, { selected: false });
+        }
+        selectedZoneId = null;
+      }
+      zoneFeatureIdCounter = 1;
 
       const ensureSource = (id, data) => {
         if (map.getSource(id)) {
@@ -959,16 +1110,13 @@
 
       Object.entries(areaSplits || {}).forEach(([areaCode, rules]) => {
         const areaFeature = areaFeatureByCode[areaCode.toUpperCase()];
-        const ring = areaFeature?.geometry?.coordinates?.[0];
-        if (!ring || ring.length < 4) return;
+        const ringRaw = areaFeature?.geometry?.coordinates?.[0];
+        const ring = sanitizeRing(ringRaw);
+        if (!ring.length) return;
 
-        const centroid = polygonCentroid(ring);
+        const splitLines = [];
 
-        // Split areas: remove main qnh
-        // (actual property clearing happens in applyAreaQnhToPolygons)
-
-        // For label placement: collect boundaries for "between" pairs
-        rules.forEach((rule, idx) => {
+        (rules || []).forEach((rule, idx) => {
           if (rule.type === 'between') {
             const lhsPts = buildSidePoints(rule.lhs);
             const rhsPts = buildSidePoints(rule.rhs);
@@ -977,137 +1125,64 @@
 
             const lhsCoords = lhsPts.map(p => p.coord);
             const rhsCoords = rhsPts.map(p => p.coord);
-
-            // Extend to borders then clip within the area polygon
             const lhsExt = extendPolylineToBorders(lhsCoords, ring);
             const rhsExt = extendPolylineToBorders(rhsCoords, ring);
+            if (lhsExt.length < 2 || rhsExt.length < 2) return;
 
             const lhsClippedSegs = clipPolylineToPolygon(lhsExt, ring);
             const rhsClippedSegs = clipPolylineToPolygon(rhsExt, ring);
-
             lhsClippedSegs.forEach((seg) => {
               lineFeatures.push({
                 type: 'Feature',
                 properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'lhs', idx },
                 geometry: { type: 'LineString', coordinates: seg }
               });
+              splitLines.push({ a: seg[0], b: seg[1] });
             });
-
             rhsClippedSegs.forEach((seg) => {
               lineFeatures.push({
                 type: 'Feature',
                 properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'rhs', idx },
                 geometry: { type: 'LineString', coordinates: seg }
               });
+              splitLines.push({ a: seg[0], b: seg[1] });
             });
 
-            // Place qnh label roughly in-between the two boundaries
-            const lhsMidRaw = midPointOfCoords(lhsCoords) || centroid;
-            const rhsMidRaw = midPointOfCoords(rhsCoords) || centroid;
-            const lhsMid = pushInsidePolygon(lhsMidRaw, ring, centroid);
-            const rhsMid = pushInsidePolygon(rhsMidRaw, ring, centroid);
-            const betweenMid = [(lhsMid[0] + rhsMid[0]) / 2, (lhsMid[1] + rhsMid[1]) / 2];
-
-            let betweenPoly = [];
-            if (lhsExt.length >= 2 && rhsExt.length >= 2) {
-              betweenPoly = clipPolygonToSideOfPolyline(ring, lhsExt, rhsMid);
-              if (betweenPoly.length) betweenPoly = clipPolygonToSideOfPolyline(betweenPoly, rhsExt, lhsMid);
-            }
-
-            if (betweenPoly.length < 3) return;
-
-            const poly = ensureClosedRing(betweenPoly);
-            zonePolygons.push({ area: areaCode, qnh: rule.qnh, poly });
-
-            const avoid = zonePolygons.filter(z => z.area === areaCode).map(z => z.poly);
-            const finalLabelPt = bestInteriorPoint(poly, avoid) || pushInsidePolygon(polygonCentroid(poly), poly, centroid);
-
-            zoneLabelFeatures.push({
-              type: 'Feature',
-              properties: { area: areaCode, qnh: rule.qnh, kind: 'between' },
-              geometry: { type: 'Point', coordinates: finalLabelPt }
-            });
           }
 
           if (rule.type === 'of') {
             const pts = buildSidePoints(rule.lhs);
             pts.forEach(p => addPoint(areaCode, p));
-
             const coords = pts.map(p => p.coord);
             if (coords.length < 2) return;
 
             const ext = extendPolylineToBorders(coords, ring);
             const clippedSegs = clipPolylineToPolygon(ext, ring);
-
             clippedSegs.forEach((seg) => {
               lineFeatures.push({
                 type: 'Feature',
                 properties: { area: areaCode, qnh: rule.qnh, type: 'of', dir: rule.dir || '', idx },
                 geometry: { type: 'LineString', coordinates: seg }
               });
+              splitLines.push({ a: seg[0], b: seg[1] });
             });
 
-            // Place qnh label slightly on the named side of the boundary (visual approximation)
-            const midRaw = midPointOfCoords(coords) || centroid;
-            const mid = pushInsidePolygon(midRaw, ring, centroid);
-            const dirVec = dirToVector(rule.dir || 'E');
-            const offset = [mid[0] + dirVec[0] * 0.8, mid[1] + dirVec[1] * 0.8];
-            const bounds = ringBounds(ring);
-            const span = Math.max((bounds.maxX - bounds.minX) || 1, (bounds.maxY - bounds.minY) || 1);
-            const farSample = offsetFromCentroid(ring, dirVec, span * 2);
-            const ofPoly = clipPolygonToSideOfPolyline(ring, ext, farSample);
-            if (ofPoly.length < 3) return;
-
-            const poly = ensureClosedRing(ofPoly);
-            zonePolygons.push({ area: areaCode, qnh: rule.qnh, poly });
-
-            const avoid = zonePolygons.filter(z => z.area === areaCode).map(z => z.poly);
-            const finalLabelPt = bestInteriorPoint(poly, avoid) || pushInsidePolygon(polygonCentroid(poly), poly, centroid);
-
-            zoneLabelFeatures.push({
-              type: 'Feature',
-              properties: { area: areaCode, qnh: rule.qnh, kind: `${rule.dir || ''}OF` },
-              geometry: { type: 'Point', coordinates: finalLabelPt }
-            });
-          }
-
-          if (rule.type === 'rest') {
-            // Put REST in the centroid, but if there are other labels, nudge it slightly
-            let labelPt = centroid;
-            if (rules.length > 1) {
-              // small deterministic nudge based on area code + idx
-              const nudge = ((idx + areaCode.length) % 5) * 0.12;
-              labelPt = pushInsidePolygon([centroid[0] - nudge, centroid[1] - nudge], ring, centroid);
-            }
-
-            const avoid = zonePolygons.filter(z => z.area === areaCode).map(z => z.poly);
-            const bestPt = bestInteriorPoint(ring, avoid);
-            labelPt = bestPt || findOpenPointInRing(ring, avoid, labelPt) || bestInteriorPoint(ring, null) || pushInsidePolygon(centroid, ring, centroid);
-            if (labelPt && pointInAnyPolygon(labelPt, avoid)) {
-              const guard = bestInteriorPointWithPredicate(ring, avoid, (p) => !pointInAnyPolygon(p, avoid));
-              labelPt = guard || null;
-            }
-
-          zonePolygons.push({ area: areaCode, qnh: rule.qnh, poly: ensureClosedRing(ring) });
-
-            zoneLabelFeatures.push({
-              type: 'Feature',
-                properties: { area: areaCode, qnh: rule.qnh, kind: 'rest' },
-                geometry: { type: 'Point', coordinates: labelPt }
-              });
           }
         });
+
       });
 
       const lineFC = { type: 'FeatureCollection', features: lineFeatures };
       const pointFC = { type: 'FeatureCollection', features: pointFeatures };
       const labelFC = { type: 'FeatureCollection', features: labelFeatures };
-      const zoneLabelFC = { type: 'FeatureCollection', features: zoneLabelFeatures };
+      const zoneLabelFC = { type: 'FeatureCollection', features: [] };
+      const zoneFillFC = { type: 'FeatureCollection', features: [] };
 
       ensureSource('qnh-split-lines', lineFC);
       ensureSource('qnh-split-points', pointFC);
       ensureSource('qnh-split-labels', labelFC);
       ensureSource('qnh-zone-labels', zoneLabelFC);
+      ensureSource('qnh-zone-fills', zoneFillFC);
 
       if (!map.getLayer('qnh-split-lines')) {
         map.addLayer({
@@ -1161,29 +1236,35 @@
         });
       }
 
-      if (!map.getLayer('qnh-split-labels')) {
+      if (!map.getLayer('qnh-zone-fills')) {
         map.addLayer({
-          id: 'qnh-split-labels',
-          type: 'symbol',
-          source: 'qnh-split-labels',
-          layout: {
-            'text-field': ['to-string', ['get', 'qnh']],
-            'text-font': ['Noto Sans Regular'],
-            'text-size': 16,
-            'text-allow-overlap': true,
-            'symbol-z-order': 'source',
-            'text-offset': [0, ['get', 'offsetY']
-            ]
-          },
+          id: 'qnh-zone-fills',
+          type: 'fill',
+          source: 'qnh-zone-fills',
           paint: {
-            'text-color': '#0a7e2f',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1.2
+            'fill-color': [
+              'case',
+              ['==', ['get', 'kind'], 'rest'], '#ff4d4d', // REST in red
+              '#00a2ff' // others in blue
+            ],
+            'fill-opacity': 0.25
           }
         });
       }
 
-      // ✅ NEW: per-zone green QNH labels inside split areas
+      if (!map.getLayer('qnh-zone-fills-outline')) {
+        map.addLayer({
+          id: 'qnh-zone-fills-outline',
+          type: 'line',
+          source: 'qnh-zone-fills',
+          paint: {
+            'line-color': '#0044ff',
+            'line-width': 3,
+            'line-opacity': 0.9
+          }
+        });
+      }
+
       if (!map.getLayer('qnh-zone-labels')) {
         map.addLayer({
           id: 'qnh-zone-labels',
@@ -1204,62 +1285,90 @@
           }
         });
       }
+
+      if (!zoneClickBound) {
+        zoneClickBound = true;
+        map.on('click', 'qnh-zone-fills', (e) => {
+          const features = map.queryRenderedFeatures(e.point, { layers: ['qnh-zone-fills'] });
+          if (!features.length) return;
+          const f = features[0];
+          const fid = f.id;
+          if (selectedZoneId !== null) {
+            map.setFeatureState({ source: 'qnh-zone-fills', id: selectedZoneId }, { selected: false });
+          }
+          selectedZoneId = fid;
+          map.setFeatureState({ source: 'qnh-zone-fills', id: fid }, { selected: true });
+          const props = f.properties || {};
+          const name = props.name || `Zone ${fid}`;
+          const area = props.area || 'Unknown';
+          const qnh = props.qnh || '';
+          new maplibregl.Popup({ closeButton: true })
+            .setLngLat(e.lngLat)
+            .setHTML(`<strong>${name}</strong><br>Area: ${area}<br>QNH: ${qnh}`)
+            .addTo(map);
+        });
+      }
+
+      // persist for diagnostics
+      lastZonePolygons = zonePolygons.slice();
+      lastZoneLabelCandidates = zoneLabelFeatures.slice();
+      lastZoneLabelFeatures = zoneLabelFeatures.slice();
+
     }
 
-    // -------------------------
-    // GREEN LINE PATCHES END
-    // -------------------------
+    // Diagnostic: log or highlight any computed zone polygons missing an assigned QNH
+    function dumpMissingQnhs() {
+      if (!lastZonePolygons || !lastZonePolygons.length) {
+        console.info('No zone polygons available yet. Run a QNH fetch to compute split zones.');
+        return;
+      }
 
-    function applyAreaQnhToPolygons() {
-      if (!areaGeoJSON) return;
-      let count = 0;
-      areaGeoJSON.features.forEach(f => {
-        const code = f.properties?.area_code?.toUpperCase();
-        const hasSplits = !!(code && areaSplits && areaSplits[code]);
-        const match = code ? areaQnhMap[code] : null;
+      const missing = [];
+      const unlabeled = [];
 
-        // If area has split rules, remove main qnh (it will be shown by green zone labels)
-        if (hasSplits) {
-          delete f.properties.qnh;
-          return;
-        }
+      const labelPts = (lastZoneLabelFeatures || []).map(f => ({ area: (f.properties && f.properties.area || '').toUpperCase(), qnh: f.properties && f.properties.qnh, coord: f.geometry && f.geometry.coordinates }));
 
-        if (match) {
-          f.properties.qnh = match.qnh;
-          count++;
-        } else {
-          delete f.properties.qnh;
-        }
+      lastZonePolygons.forEach((pz, idx) => {
+        const area = (pz.area || '').toUpperCase();
+        const assigned = pz.qnh;
+        const poly = pz.poly || pz.polygon || (pz.polygon && pz.polygon.geometry && pz.polygon.geometry.coordinates && pz.polygon.geometry.coordinates[0]);
+        if (!assigned) missing.push({ idx, area, polygon: pz });
+
+        const hasLabel = labelPts.some(lp => lp.area === area && lp.qnh === assigned && (() => {
+          try { return turf.booleanPointInPolygon(turf.point(lp.coord), turf.polygon([pz.poly || pz.polygon])); } catch (e) { return false; }
+        })());
+        if (!hasLabel) unlabeled.push({ idx, area, qnh: assigned });
       });
-      if (map.getSource('areas')) map.getSource('areas').setData(areaGeoJSON);
-      console.log('Applied QNH to', count, 'areas');
+
+      console.group('Dump Missing QNHs');
+      console.log('Total pieces:', lastZonePolygons.length);
+      console.log('Pieces with no assigned QNH:', missing.length, missing.map(m => `${m.area}#${m.idx}`));
+      console.log('Pieces with assigned QNH but no placed label:', unlabeled.length, unlabeled.map(u => `${u.area}#${u.idx} (${u.qnh || '—'})`));
+
+      if (missing.length) console.log('Missing pieces detail:', missing);
+      if (unlabeled.length) console.log('Unlabeled pieces detail:', unlabeled);
+
+      const missingFeatures = missing.map(m => ({ type: 'Feature', properties: { area: m.area }, geometry: m.polygon && m.polygon.geometry ? m.polygon.geometry : null }));
+      if (map.getSource('qnh-missing-polygons')) {
+        map.getSource('qnh-missing-polygons').setData({ type: 'FeatureCollection', features: missingFeatures });
+      } else {
+        map.addSource('qnh-missing-polygons', { type: 'geojson', data: { type: 'FeatureCollection', features: missingFeatures } });
+        map.addLayer({ id: 'qnh-missing-polygons-fill', type: 'fill', source: 'qnh-missing-polygons', paint: { 'fill-color': '#ffdddd', 'fill-opacity': 0.6, 'fill-outline-color': '#ff3333' } });
+      }
+
+      console.groupEnd();
+      return { missing, unlabeled };
     }
 
-    function fitToAreas(geojson) {
-      const bounds = getGeoJsonBounds(geojson);
-      if (bounds) map.fitBounds(bounds, { padding: 40, maxZoom: 6 });
+    // Helper used above (small utility) - offset sample point from centroid in given dir
+    function offsetFromCentroid(ring, dirVec, distance) {
+      const c = polygonCentroid(ring);
+      return [c[0] + dirVec[0] * distance, c[1] + dirVec[1] * distance];
     }
 
-    function getGeoJsonBounds(geojson) {
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      const update = ([x, y]) => {
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-        if (x < -180 || x > 180 || y < -90 || y > 90) return;
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      };
-      const walk = coords => {
-        if (!Array.isArray(coords)) return;
-        if (typeof coords[0] === 'number') update(coords);
-        else coords.forEach(walk);
-      };
-      if (!geojson?.features) return null;
-      geojson.features.forEach(f => f.geometry?.coordinates && walk(f.geometry.coordinates));
-      if (!Number.isFinite(minX)) return null;
-      return [[minX, minY], [maxX, maxY]];
-    }
+    // expose dump helper to console for quick debugging
+    window.dumpMissingQnhs = dumpMissingQnhs;
+
   </script>
 </body>
 </html>
