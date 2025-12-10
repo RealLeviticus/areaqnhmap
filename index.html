@@ -622,6 +622,147 @@
       return fallback;
     }
 
+    function ensureClosedRing(ring) {
+      if (!ring || !ring.length) return [];
+      const closed = ring.slice();
+      const first = closed[0];
+      const last = closed[closed.length - 1];
+      if (Math.abs(first[0] - last[0]) > EPS || Math.abs(first[1] - last[1]) > EPS) {
+        closed.push([first[0], first[1]]);
+      }
+      return closed;
+    }
+
+    function dirToVector(dir) {
+      const d = (dir || '').toUpperCase();
+      const dx = (d.includes('E') ? 1 : 0) - (d.includes('W') ? 1 : 0);
+      const dy = (d.includes('N') ? 1 : 0) - (d.includes('S') ? 1 : 0);
+      const v = normalise([dx, dy]);
+      return (Math.abs(v[0]) < EPS && Math.abs(v[1]) < EPS) ? [1, 0] : v;
+    }
+
+    function signedSide(p, a, b) {
+      // Positive means p is to the left of a->b
+      return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
+    }
+
+    function intersectSegmentWithLine(p1, p2, a, b) {
+      // Intersection of segment p1->p2 with infinite line a->b
+      const r = [p2[0] - p1[0], p2[1] - p1[1]];
+      const s = [b[0] - a[0], b[1] - a[1]];
+      const denom = r[0] * s[1] - r[1] * s[0];
+      if (Math.abs(denom) < EPS) return null;
+      const qp = [a[0] - p1[0], a[1] - p1[1]];
+      const t = (qp[0] * s[1] - qp[1] * s[0]) / denom;
+      if (t < -EPS || t > 1 + EPS) return null;
+      return [p1[0] + t * r[0], p1[1] + t * r[1]];
+    }
+
+    function clipPolygonWithLine(ring, a, b, keepPositive = true) {
+      // Sutherland–Hodgman against a single infinite line
+      const closed = ensureClosedRing(ring);
+      if (closed.length < 3) return [];
+      const out = [];
+      for (let i = 0; i < closed.length - 1; i++) {
+        const p1 = closed[i];
+        const p2 = closed[i + 1];
+        const d1 = signedSide(p1, a, b);
+        const d2 = signedSide(p2, a, b);
+        const inside1 = keepPositive ? d1 >= -EPS : d1 <= EPS;
+        const inside2 = keepPositive ? d2 >= -EPS : d2 <= EPS;
+
+        if (inside1 && inside2) {
+          out.push(p2);
+        } else if (inside1 && !inside2) {
+          const hit = intersectSegmentWithLine(p1, p2, a, b);
+          if (hit) out.push(hit);
+        } else if (!inside1 && inside2) {
+          const hit = intersectSegmentWithLine(p1, p2, a, b);
+          if (hit) out.push(hit);
+          out.push(p2);
+        }
+      }
+
+      if (out.length) {
+        const first = out[0];
+        const last = out[out.length - 1];
+        if (Math.abs(first[0] - last[0]) > EPS || Math.abs(first[1] - last[1]) > EPS) {
+          out.push([first[0], first[1]]);
+        }
+      }
+      return out;
+    }
+
+    function clipPolygonWithPolyline(ring, coords, dirVec) {
+      // Clip polygon to the named side of each segment in the polyline
+      if (!coords || coords.length < 2) return [];
+      let poly = ensureClosedRing(ring);
+      const v = dirVec || [1, 0];
+      for (let i = 0; i < coords.length - 1; i++) {
+        const a = coords[i];
+        const b = coords[i + 1];
+        const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+        const ref = [mid[0] + v[0], mid[1] + v[1]];
+        const keepPositive = signedSide(ref, a, b) >= 0;
+        poly = clipPolygonWithLine(poly, a, b, keepPositive);
+        if (!poly.length) break;
+      }
+      return poly;
+    }
+
+    function clipPolygonToSideOfPolyline(ring, coords, samplePoint) {
+      // Keep the side of each segment that contains samplePoint
+      if (!coords || coords.length < 2 || !samplePoint) return [];
+      let poly = ensureClosedRing(ring);
+      const safeSample = pushInsidePolygon(samplePoint, ring, polygonCentroid(ring));
+      for (let i = 0; i < coords.length - 1; i++) {
+        const a = coords[i];
+        const b = coords[i + 1];
+        const keepPositive = signedSide(safeSample, a, b) >= 0;
+        poly = clipPolygonWithLine(poly, a, b, keepPositive);
+        if (!poly.length) break;
+      }
+      return poly;
+    }
+
+    function pointInAnyPolygon(pt, polygons) {
+      return polygons.some(poly => pointInPolygon(pt, poly));
+    }
+
+    function ringBounds(ring) {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      ring.forEach(([x, y]) => {
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      });
+      return { minX, minY, maxX, maxY };
+    }
+
+    function findOpenPointInRing(ring, avoidPolys, fallback) {
+      // Find a point inside ring but outside any avoidPolys
+      const centroid = polygonCentroid(ring);
+      const base = fallback || centroid;
+      const bounds = ringBounds(ring);
+      const spanX = (bounds.maxX - bounds.minX) || 1;
+      const spanY = (bounds.maxY - bounds.minY) || 1;
+      const isFree = (pt) => pointInPolygon(pt, ring) && !pointInAnyPolygon(pt, avoidPolys || []);
+      if (isFree(base)) return base;
+      const radii = [0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.3, 1.6];
+      for (const r of radii) {
+        for (let ang = 0; ang < 360; ang += 30) {
+          const rad = ang * Math.PI / 180;
+          const candidate = [
+            base[0] + Math.cos(rad) * r * spanX,
+            base[1] + Math.sin(rad) * r * spanY
+          ];
+          if (isFree(candidate)) return candidate;
+        }
+      }
+      return pushInsidePolygon(base, ring, centroid);
+    }
+
     function buildSidePoints(sideText) {
       if (!sideText) return [];
       const toks = tokenizeSplitSide(sideText);
@@ -639,6 +780,7 @@
       const pointFeatures = [];
       const labelFeatures = []; // kept for backwards compatibility (endpoint qnh labels)
       const zoneLabelFeatures = [];
+      const zonePolygons = [];
 
       const ensureSource = (id, data) => {
         if (map.getSource(id)) {
@@ -711,15 +853,35 @@
             });
 
             // Place qnh label roughly in-between the two boundaries
-            const lhsMid = midPointOfCoords(lhsCoords) || centroid;
-            const rhsMid = midPointOfCoords(rhsCoords) || centroid;
+            const lhsMidRaw = midPointOfCoords(lhsCoords) || centroid;
+            const rhsMidRaw = midPointOfCoords(rhsCoords) || centroid;
+            const lhsMid = pushInsidePolygon(lhsMidRaw, ring, centroid);
+            const rhsMid = pushInsidePolygon(rhsMidRaw, ring, centroid);
             const betweenMid = [(lhsMid[0] + rhsMid[0]) / 2, (lhsMid[1] + rhsMid[1]) / 2];
-            const labelPt = pushInsidePolygon(betweenMid, ring, centroid);
+
+            let betweenPoly = [];
+            if (lhsExt.length >= 2 && rhsExt.length >= 2) {
+              betweenPoly = clipPolygonToSideOfPolyline(ring, lhsExt, rhsMid);
+              if (betweenPoly.length) betweenPoly = clipPolygonToSideOfPolyline(betweenPoly, rhsExt, lhsMid);
+            }
+
+            const labelPt = (betweenPoly.length >= 3)
+              ? pushInsidePolygon(polygonCentroid(betweenPoly), betweenPoly, centroid)
+              : pushInsidePolygon(betweenMid, ring, centroid);
+
+            if (betweenPoly.length >= 3) {
+              zonePolygons.push({ area: areaCode, qnh: rule.qnh, poly: ensureClosedRing(betweenPoly) });
+            }
+
+            const avoid = zonePolygons.filter(z => z.area === areaCode).map(z => z.poly);
+            const finalLabelPt = pointInAnyPolygon(labelPt, avoid)
+              ? findOpenPointInRing(betweenPoly.length >= 3 ? betweenPoly : ring, avoid, labelPt)
+              : labelPt;
 
             zoneLabelFeatures.push({
               type: 'Feature',
               properties: { area: areaCode, qnh: rule.qnh, kind: 'between' },
-              geometry: { type: 'Point', coordinates: labelPt }
+              geometry: { type: 'Point', coordinates: finalLabelPt }
             });
           }
 
@@ -742,14 +904,29 @@
             });
 
             // Place qnh label slightly on the named side of the boundary (visual approximation)
-            const mid = midPointOfCoords(coords) || centroid;
-            const offset = offsetByDir(mid, rule.dir || 'E', 0.8);
-            const labelPt = pushInsidePolygon(offset, ring, centroid);
+            const midRaw = midPointOfCoords(coords) || centroid;
+            const mid = pushInsidePolygon(midRaw, ring, centroid);
+            const dirVec = dirToVector(rule.dir || 'E');
+            const sample = pushInsidePolygon([mid[0] + dirVec[0] * 0.5, mid[1] + dirVec[1] * 0.5], ring, centroid);
+            const offset = [mid[0] + dirVec[0] * 0.8, mid[1] + dirVec[1] * 0.8];
+            const ofPoly = clipPolygonToSideOfPolyline(ring, ext, sample);
+            const labelPt = (ofPoly.length >= 3)
+              ? pushInsidePolygon(polygonCentroid(ofPoly), ofPoly, centroid)
+              : pushInsidePolygon(offset, ring, centroid);
+
+            if (ofPoly.length >= 3) {
+              zonePolygons.push({ area: areaCode, qnh: rule.qnh, poly: ensureClosedRing(ofPoly) });
+            }
+
+            const avoid = zonePolygons.filter(z => z.area === areaCode).map(z => z.poly);
+            const finalLabelPt = pointInAnyPolygon(labelPt, avoid)
+              ? findOpenPointInRing(ofPoly.length >= 3 ? ofPoly : ring, avoid, labelPt)
+              : labelPt;
 
             zoneLabelFeatures.push({
               type: 'Feature',
               properties: { area: areaCode, qnh: rule.qnh, kind: `${rule.dir || ''}OF` },
-              geometry: { type: 'Point', coordinates: labelPt }
+              geometry: { type: 'Point', coordinates: finalLabelPt }
             });
           }
 
@@ -761,6 +938,9 @@
               const nudge = ((idx + areaCode.length) % 5) * 0.12;
               labelPt = pushInsidePolygon([centroid[0] - nudge, centroid[1] - nudge], ring, centroid);
             }
+
+            const avoid = zonePolygons.filter(z => z.area === areaCode).map(z => z.poly);
+            labelPt = findOpenPointInRing(ring, avoid, labelPt);
 
             zoneLabelFeatures.push({
               type: 'Feature',
