@@ -740,6 +740,155 @@
       return { minX, minY, maxX, maxY };
     }
 
+    function offsetFromCentroid(ring, dirVec, scale = 1) {
+      const c = polygonCentroid(ring);
+      return [c[0] + dirVec[0] * scale, c[1] + dirVec[1] * scale];
+    }
+
+    function pointSegDist(p, a, b) {
+      const vx = b[0] - a[0];
+      const vy = b[1] - a[1];
+      const wx = p[0] - a[0];
+      const wy = p[1] - a[1];
+      const c1 = vx * wx + vy * wy;
+      const c2 = vx * vx + vy * vy;
+      const t = c2 > EPS ? Math.max(0, Math.min(1, c1 / c2)) : 0;
+      const px = a[0] + t * vx;
+      const py = a[1] + t * vy;
+      const dx = p[0] - px;
+      const dy = p[1] - py;
+      return Math.hypot(dx, dy);
+    }
+
+    function pointToPolygonDist(p, ring) {
+      if (!ring || ring.length < 2) return Infinity;
+      let minD = Infinity;
+      for (let i = 0; i < ring.length - 1; i++) {
+        const a = ring[i];
+        const b = ring[i + 1];
+        const d = pointSegDist(p, a, b);
+        if (d < minD) minD = d;
+      }
+      return minD;
+    }
+
+    function pointToPolygonsDist(p, polys) {
+      if (!polys || !polys.length) return Infinity;
+      let best = Infinity;
+      polys.forEach(poly => {
+        const d = pointToPolygonDist(p, poly);
+        if (d < best) best = d;
+      });
+      return best;
+    }
+
+    function bestInteriorPoint(ring, avoidPolys) {
+      if (!ring || ring.length < 3) return null;
+      const bounds = ringBounds(ring);
+      const width = bounds.maxX - bounds.minX;
+      const height = bounds.maxY - bounds.minY;
+      const baseStep = Math.max(width, height) || 1;
+      let best = null;
+      let bestScore = -Infinity;
+
+      const consider = (pt) => {
+        if (!pointInPolygon(pt, ring)) return;
+        if (avoidPolys && pointInAnyPolygon(pt, avoidPolys)) return;
+        const distToRing = pointToPolygonDist(pt, ring);
+        const distToAvoid = pointToPolygonsDist(pt, avoidPolys);
+        const score = Math.min(distToRing, distToAvoid);
+        if (score > bestScore + 1e-6) {
+          bestScore = score;
+          best = pt;
+        }
+      };
+
+      consider(polygonCentroid(ring));
+
+      const iterations = 5;
+      for (let iter = 0; iter < iterations; iter++) {
+        const step = baseStep / Math.pow(2, iter + 1);
+        for (let x = bounds.minX; x <= bounds.maxX + EPS; x += step) {
+          for (let y = bounds.minY; y <= bounds.maxY + EPS; y += step) {
+            consider([x, y]);
+          }
+        }
+      }
+
+      if (best && (!avoidPolys || !pointInAnyPolygon(best, avoidPolys))) {
+        return best;
+      }
+      return null;
+    }
+
+    function pointOnSameSideAsSample(pt, coords, sample) {
+      if (!coords || coords.length < 2 || !sample) return true;
+      for (let i = 0; i < coords.length - 1; i++) {
+        const a = coords[i];
+        const b = coords[i + 1];
+        const keepPositive = signedSide(sample, a, b) >= 0;
+        const side = signedSide(pt, a, b);
+        if (keepPositive ? side < -EPS : side > EPS) return false;
+      }
+      return true;
+    }
+
+    function bestInteriorPointWithPredicate(ring, avoidPolys, predicate) {
+      if (!predicate) return bestInteriorPoint(ring, avoidPolys);
+      if (!ring || ring.length < 3) return null;
+      const bounds = ringBounds(ring);
+      const width = bounds.maxX - bounds.minX;
+      const height = bounds.maxY - bounds.minY;
+      const baseStep = Math.max(width, height) || 1;
+      let best = null;
+      let bestScore = -Infinity;
+
+      const consider = (pt) => {
+        if (!pointInPolygon(pt, ring)) return;
+        if (avoidPolys && pointInAnyPolygon(pt, avoidPolys)) return;
+        if (!predicate(pt)) return;
+        const distToRing = pointToPolygonDist(pt, ring);
+        const distToAvoid = pointToPolygonsDist(pt, avoidPolys);
+        const score = Math.min(distToRing, distToAvoid);
+        if (score > bestScore + 1e-6) {
+          bestScore = score;
+          best = pt;
+        }
+      };
+
+      consider(polygonCentroid(ring));
+
+      const iterations = 5;
+      for (let iter = 0; iter < iterations; iter++) {
+        const step = baseStep / Math.pow(2, iter + 1);
+        for (let x = bounds.minX; x <= bounds.maxX + EPS; x += step) {
+          for (let y = bounds.minY; y <= bounds.maxY + EPS; y += step) {
+            consider([x, y]);
+          }
+        }
+      }
+
+      return best;
+    }
+
+    function makeTinyBox(pt, sizeDeg = 0.1) {
+      if (!pt) return null;
+      const [x, y] = pt;
+      return ensureClosedRing([
+        [x - sizeDeg, y - sizeDeg],
+        [x + sizeDeg, y - sizeDeg],
+        [x + sizeDeg, y + sizeDeg],
+        [x - sizeDeg, y + sizeDeg]
+      ]);
+    }
+
+    function ensurePointOnSide(pt, coords, sample, ring) {
+      if (!pt) return null;
+      if (pointOnSameSideAsSample(pt, coords, sample)) return pt;
+      const safe = pushInsidePolygon(sample || pt, ring, polygonCentroid(ring));
+      return pointOnSameSideAsSample(safe, coords, sample) ? safe : null;
+    }
+
     function findOpenPointInRing(ring, avoidPolys, fallback) {
       // Find a point inside ring but outside any avoidPolys
       const centroid = polygonCentroid(ring);
@@ -760,7 +909,7 @@
           if (isFree(candidate)) return candidate;
         }
       }
-      return pushInsidePolygon(base, ring, centroid);
+      return null;
     }
 
     function buildSidePoints(sideText) {
@@ -865,18 +1014,13 @@
               if (betweenPoly.length) betweenPoly = clipPolygonToSideOfPolyline(betweenPoly, rhsExt, lhsMid);
             }
 
-            const labelPt = (betweenPoly.length >= 3)
-              ? pushInsidePolygon(polygonCentroid(betweenPoly), betweenPoly, centroid)
-              : pushInsidePolygon(betweenMid, ring, centroid);
+            if (betweenPoly.length < 3) return;
 
-            if (betweenPoly.length >= 3) {
-              zonePolygons.push({ area: areaCode, qnh: rule.qnh, poly: ensureClosedRing(betweenPoly) });
-            }
+            const poly = ensureClosedRing(betweenPoly);
+            zonePolygons.push({ area: areaCode, qnh: rule.qnh, poly });
 
             const avoid = zonePolygons.filter(z => z.area === areaCode).map(z => z.poly);
-            const finalLabelPt = pointInAnyPolygon(labelPt, avoid)
-              ? findOpenPointInRing(betweenPoly.length >= 3 ? betweenPoly : ring, avoid, labelPt)
-              : labelPt;
+            const finalLabelPt = bestInteriorPoint(poly, avoid) || pushInsidePolygon(polygonCentroid(poly), poly, centroid);
 
             zoneLabelFeatures.push({
               type: 'Feature',
@@ -907,21 +1051,18 @@
             const midRaw = midPointOfCoords(coords) || centroid;
             const mid = pushInsidePolygon(midRaw, ring, centroid);
             const dirVec = dirToVector(rule.dir || 'E');
-            const sample = pushInsidePolygon([mid[0] + dirVec[0] * 0.5, mid[1] + dirVec[1] * 0.5], ring, centroid);
             const offset = [mid[0] + dirVec[0] * 0.8, mid[1] + dirVec[1] * 0.8];
-            const ofPoly = clipPolygonToSideOfPolyline(ring, ext, sample);
-            const labelPt = (ofPoly.length >= 3)
-              ? pushInsidePolygon(polygonCentroid(ofPoly), ofPoly, centroid)
-              : pushInsidePolygon(offset, ring, centroid);
+            const bounds = ringBounds(ring);
+            const span = Math.max((bounds.maxX - bounds.minX) || 1, (bounds.maxY - bounds.minY) || 1);
+            const farSample = offsetFromCentroid(ring, dirVec, span * 2);
+            const ofPoly = clipPolygonToSideOfPolyline(ring, ext, farSample);
+            if (ofPoly.length < 3) return;
 
-            if (ofPoly.length >= 3) {
-              zonePolygons.push({ area: areaCode, qnh: rule.qnh, poly: ensureClosedRing(ofPoly) });
-            }
+            const poly = ensureClosedRing(ofPoly);
+            zonePolygons.push({ area: areaCode, qnh: rule.qnh, poly });
 
             const avoid = zonePolygons.filter(z => z.area === areaCode).map(z => z.poly);
-            const finalLabelPt = pointInAnyPolygon(labelPt, avoid)
-              ? findOpenPointInRing(ofPoly.length >= 3 ? ofPoly : ring, avoid, labelPt)
-              : labelPt;
+            const finalLabelPt = bestInteriorPoint(poly, avoid) || pushInsidePolygon(polygonCentroid(poly), poly, centroid);
 
             zoneLabelFeatures.push({
               type: 'Feature',
@@ -940,13 +1081,20 @@
             }
 
             const avoid = zonePolygons.filter(z => z.area === areaCode).map(z => z.poly);
-            labelPt = findOpenPointInRing(ring, avoid, labelPt);
+            const bestPt = bestInteriorPoint(ring, avoid);
+            labelPt = bestPt || findOpenPointInRing(ring, avoid, labelPt) || bestInteriorPoint(ring, null) || pushInsidePolygon(centroid, ring, centroid);
+            if (labelPt && pointInAnyPolygon(labelPt, avoid)) {
+              const guard = bestInteriorPointWithPredicate(ring, avoid, (p) => !pointInAnyPolygon(p, avoid));
+              labelPt = guard || null;
+            }
+
+          zonePolygons.push({ area: areaCode, qnh: rule.qnh, poly: ensureClosedRing(ring) });
 
             zoneLabelFeatures.push({
               type: 'Feature',
-              properties: { area: areaCode, qnh: rule.qnh, kind: 'rest' },
-              geometry: { type: 'Point', coordinates: labelPt }
-            });
+                properties: { area: areaCode, qnh: rule.qnh, kind: 'rest' },
+                geometry: { type: 'Point', coordinates: labelPt }
+              });
           }
         });
       });
