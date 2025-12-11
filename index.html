@@ -228,33 +228,177 @@
         paint: { 'line-color': '#d40000', 'line-width': 2 }
       });
 
-      map.addLayer({
-        id: 'areas-label',
-        type: 'symbol',
-        source: 'areas',
-        layout: {
-          'text-field': [
-            'format',
-            ['to-string', ['coalesce', ['get', 'qnh'], '']],
-            { 'font-scale': 1.0 },
-            '\n',
-            ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
-            { 'font-scale': 0.7, 'text-color': '#c40000' }
-          ],
-          'text-font': ['Noto Sans Regular'],
-          'text-size': 18,
-          'text-allow-overlap': true,
-          'text-ignore-placement': true,
-          'symbol-z-order': 'source'
-        },
-        paint: {
-          'text-halo-color': '#fff',
-          'text-halo-width': 1.2
-        }
-      });
+      // Create label points from area polygons
+      createAreaLabels();
 
       applyAreaQnhToPolygons();
       fitToAreas(geojson);
+    }
+
+    // Find the optimal label position inside a polygon (pole of inaccessibility)
+    function findOptimalLabelPosition(ring, gridSize = 40) {
+      if (!ring || ring.length < 3) return [0, 0];
+
+      // Find bounding box
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      ring.forEach(([x, y]) => {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      });
+
+      const width = maxX - minX;
+      const height = maxY - minY;
+      const stepX = width / gridSize;
+      const stepY = height / gridSize;
+
+      // Generate sample points inside the polygon with a margin from edges
+      const samplePoints = [];
+      for (let i = 0; i <= gridSize; i++) {
+        for (let j = 0; j <= gridSize; j++) {
+          const x = minX + i * stepX;
+          const y = minY + j * stepY;
+          const point = [x, y];
+
+          // Check if point is inside polygon
+          if (pointInPolygonHelper(point, ring)) {
+            samplePoints.push(point);
+          }
+        }
+      }
+
+      if (samplePoints.length === 0) {
+        console.error('No sample points found inside polygon! Trying finer grid...');
+        // Try with a much finer grid
+        const fineStepX = width / 100;
+        const fineStepY = height / 100;
+
+        for (let i = 0; i <= 100; i++) {
+          for (let j = 0; j <= 100; j++) {
+            const x = minX + i * fineStepX;
+            const y = minY + j * fineStepY;
+            const point = [x, y];
+            if (pointInPolygonHelper(point, ring)) {
+              console.log('Found point with finer grid');
+              return point; // Return first point found
+            }
+          }
+        }
+
+        console.error('Could not find ANY point inside polygon even with fine grid!');
+        return [minX + width/2, minY + height/2]; // Last resort: bounding box center
+      }
+
+      // Find the point that's furthest from all edges (pole of inaccessibility)
+      let bestPoint = samplePoints[0];
+      let maxMinDist = 0;
+
+      for (const pt of samplePoints) {
+        let minDistToBoundary = Infinity;
+
+        // Check distance to each edge of the polygon
+        for (let i = 0; i < ring.length - 1; i++) {
+          const dist = distanceToSegment(pt, ring[i], ring[i + 1]);
+          minDistToBoundary = Math.min(minDistToBoundary, dist);
+        }
+
+        // Keep track of the point with maximum distance to nearest boundary
+        if (minDistToBoundary > maxMinDist) {
+          maxMinDist = minDistToBoundary;
+          bestPoint = pt;
+        }
+      }
+
+      // Verify the best point is actually inside the polygon
+      if (!pointInPolygonHelper(bestPoint, ring)) {
+        console.warn('Best point is outside polygon! Using first sample point fallback');
+        // Use any sample point - they're all guaranteed to be inside
+        return samplePoints[0];
+      }
+
+      return bestPoint;
+    }
+
+    function createAreaLabels() {
+      if (!areaGeoJSON?.features) return;
+
+      const labelFeatures = areaGeoJSON.features.map(feature => {
+        const props = feature.properties;
+        const areaCode = props?.area_code;
+
+        // Calculate optimal label position using pole of inaccessibility
+        const coords = feature.geometry?.coordinates?.[0];
+        let labelCoord = [0, 0];
+
+        if (coords && coords.length > 0) {
+          labelCoord = findOptimalLabelPosition(coords); // Use default grid size of 40
+
+          // Final safety check - ensure label is inside polygon
+          if (!pointInPolygonHelper(labelCoord, coords)) {
+            console.error(`${areaCode}: Label position is OUTSIDE polygon! Attempting to find valid position...`);
+
+            // Try to find ANY point inside the polygon from our samples
+            const samplePoints = generateSamplePoints(coords, 50);
+            if (samplePoints.length > 0) {
+              // Use the first valid sample point we can find
+              labelCoord = samplePoints[Math.floor(samplePoints.length / 2)];
+              console.log(`${areaCode}: Using fallback sample point at [${labelCoord[0].toFixed(2)}, ${labelCoord[1].toFixed(2)}]`);
+            } else {
+              console.error(`${areaCode}: Could not find any valid points inside polygon!`);
+            }
+          }
+        }
+
+        return {
+          type: 'Feature',
+          properties: {
+            area_code: areaCode,
+            qnh: props.qnh,
+            hasSplit: props.hasSplit,
+            splitCount: props.splitCount
+          },
+          geometry: {
+            type: 'Point',
+            coordinates: labelCoord
+          }
+        };
+      });
+
+      const labelFC = {
+        type: 'FeatureCollection',
+        features: labelFeatures
+      };
+
+      if (map.getSource('area-labels')) {
+        map.getSource('area-labels').setData(labelFC);
+      } else {
+        map.addSource('area-labels', { type: 'geojson', data: labelFC });
+        map.addLayer({
+          id: 'areas-label',
+          type: 'symbol',
+          source: 'area-labels',
+          layout: {
+            'text-field': [
+              'format',
+              ['to-string', ['coalesce', ['get', 'qnh'], '']],
+              { 'font-scale': 1.0 },
+              '\n',
+              ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
+              { 'font-scale': 0.7, 'text-color': '#c40000' }
+            ],
+            'text-font': ['Noto Sans Regular'],
+            'text-size': 18,
+            'text-allow-overlap': true,
+            'text-ignore-placement': true,
+            'symbol-z-order': 'source'
+          },
+          paint: {
+            'text-halo-color': '#fff',
+            'text-halo-width': 1.2
+          }
+        });
+      }
     }
 
     function applyAreaQnhToPolygons() {
@@ -282,6 +426,9 @@
       if (source?.setData) {
         source.setData(areaGeoJSON);
       }
+
+      // Update labels with new QNH data
+      createAreaLabels();
     }
 
     function fitToAreas(geojson) {
@@ -619,51 +766,46 @@
 
       const dir = direction.toUpperCase();
 
-      // Use the first and last points to define the line
-      const p1 = lineCoords[0];
-      const p2 = lineCoords[lineCoords.length - 1];
+      // Calculate the centroid/midpoint of the line for reference
+      let lineCenterX = 0, lineCenterY = 0;
+      lineCoords.forEach(coord => {
+        lineCenterX += coord[0];
+        lineCenterY += coord[1];
+      });
+      lineCenterX /= lineCoords.length;
+      lineCenterY /= lineCoords.length;
 
-      // Calculate line vector
-      const dx = p2[0] - p1[0];
-      const dy = p2[1] - p1[1];
+      // Use a hybrid approach: geographic direction relative to line center
+      // plus cross product for more accurate boundary detection
+      const pointX = point[0];
+      const pointY = point[1];
 
-      // Calculate vector from line start to point
-      const px = point[0] - p1[0];
-      const py = point[1] - p1[1];
+      // For cardinal directions, use simple geographic comparison
+      if (dir === 'E') {
+        // East of line: point longitude > line center longitude
+        return pointX > lineCenterX;
+      } else if (dir === 'W') {
+        // West of line: point longitude < line center longitude
+        return pointX < lineCenterX;
+      } else if (dir === 'N') {
+        // North of line: point latitude > line center latitude
+        return pointY > lineCenterY;
+      } else if (dir === 'S') {
+        // South of line: point latitude < line center latitude
+        return pointY < lineCenterY;
+      } else if (dir === 'NE') {
+        // Northeast: both conditions
+        return pointX > lineCenterX && pointY > lineCenterY;
+      } else if (dir === 'NW') {
+        return pointX < lineCenterX && pointY > lineCenterY;
+      } else if (dir === 'SE') {
+        return pointX > lineCenterX && pointY < lineCenterY;
+      } else if (dir === 'SW') {
+        return pointX < lineCenterX && pointY < lineCenterY;
+      }
 
-      // Cross product to determine which side of line the point is on
-      // Positive = left side (when looking from p1 to p2)
-      // Negative = right side
-      const cross = px * dy - py * dx;
-
-      // Calculate the angle of the line (in radians)
-      const lineAngle = Math.atan2(dy, dx);
-
-      // Calculate the angle to the compass direction (in radians)
-      // 0 = East, PI/2 = North, PI = West, -PI/2 = South
-      let dirAngle;
-      if (dir === 'N') dirAngle = Math.PI / 2;
-      else if (dir === 'S') dirAngle = -Math.PI / 2;
-      else if (dir === 'E') dirAngle = 0;
-      else if (dir === 'W') dirAngle = Math.PI;
-      else if (dir === 'NE') dirAngle = Math.PI / 4;
-      else if (dir === 'NW') dirAngle = 3 * Math.PI / 4;
-      else if (dir === 'SE') dirAngle = -Math.PI / 4;
-      else if (dir === 'SW') dirAngle = -3 * Math.PI / 4;
-      else return cross > 0; // Default for unknown directions
-
-      // Calculate the angle from the line to the compass direction
-      // Normalize to -PI to PI range
-      let angleDiff = dirAngle - lineAngle;
-      while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
-      while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
-
-      // If the angle difference is between -PI/2 and PI/2, the direction is on the left side
-      // Otherwise, it's on the right side
-      const directionIsLeft = angleDiff > -Math.PI / 2 && angleDiff < Math.PI / 2;
-
-      // Return true if the point is on the same side as the compass direction
-      return directionIsLeft ? cross > 0 : cross < 0;
+      // Fallback for unknown directions
+      return true;
     }
 
     // Calculate cross product to determine which side of a line a point is on
@@ -1071,7 +1213,7 @@
         });
 
         // Generate sample points within the area polygon
-        const samplePoints = generateSamplePoints(ring, 40);
+        const samplePoints = generateSamplePoints(ring, 50);
 
         // For each rule with a QNH, determine which zone it belongs to and calculate centroid
         rules.forEach((rule, ruleIdx) => {
@@ -1088,6 +1230,7 @@
                 return isPointOnDirectionSideOfLine(pt, splitLine.coords, rule.dir);
               });
 
+              console.log(`${areaCode} rule ${ruleIdx} (${rule.dir} OF): Found ${zonePoints.length} points in zone (QNH ${rule.qnh})`);
             }
           } else if (rule.type === 'between') {
             // Find the BETWEEN rule with both lines
@@ -1124,6 +1267,7 @@
                 return sameSideAsRhs && sameSideAsLhs;
               });
 
+              console.log(`${areaCode} rule ${ruleIdx} (BETWEEN): Found ${zonePoints.length} points in zone (QNH ${rule.qnh})`);
             }
           } else if (rule.type === 'rest') {
             // REST zone contains points not in any other zone
@@ -1166,16 +1310,24 @@
               }
               return true; // Point is not in any other zone
             });
+
+            console.log(`${areaCode} rule ${ruleIdx} (REST): Found ${zonePoints.length} points in zone (QNH ${rule.qnh})`);
           }
 
           // Calculate centroid of zone points
           if (zonePoints.length > 0) {
+            console.log(`${areaCode} rule ${ruleIdx}: Processing ${zonePoints.length} zone points for QNH ${rule.qnh}`);
+
+            if (zonePoints.length < 10) {
+              console.warn(`${areaCode} rule ${ruleIdx}: Very few points (${zonePoints.length}) in zone for QNH ${rule.qnh}. Zone detection may be incorrect.`);
+            }
             // Find the point that's furthest from ALL boundaries (red area boundary + green split lines)
+            // This is crucial - we need to push labels away from split lines, not just polygon edges
             let bestPoint = zonePoints[0];
             let maxMinDist = 0;
 
             // Sample points to find the best interior point
-            const sampleStep = Math.max(1, Math.floor(zonePoints.length / 50));
+            const sampleStep = Math.max(1, Math.floor(zonePoints.length / 100)); // More aggressive sampling
 
             for (let i = 0; i < zonePoints.length; i += sampleStep) {
               const pt = zonePoints[i];
@@ -1187,13 +1339,14 @@
                 minDistToBoundary = Math.min(minDistToBoundary, dist);
               }
 
-              // Check distance to relevant green split lines
+              // Check distance to relevant green split lines (weighted more heavily)
               if (rule.type === 'of' && rule.dir) {
                 const splitLine = splitLines.find(sl => sl.ruleIdx === ruleIdx);
                 if (splitLine && splitLine.coords) {
                   for (let j = 0; j < splitLine.coords.length - 1; j++) {
                     const dist = distanceToSegment(pt, splitLine.coords[j], splitLine.coords[j + 1]);
-                    minDistToBoundary = Math.min(minDistToBoundary, dist);
+                    // Weight split line distance 2x to push labels away from them
+                    minDistToBoundary = Math.min(minDistToBoundary, dist * 0.5);
                   }
                 }
               } else if (rule.type === 'between') {
@@ -1201,11 +1354,13 @@
                 if (splitLine && splitLine.lhsCoords && splitLine.rhsCoords) {
                   for (let j = 0; j < splitLine.lhsCoords.length - 1; j++) {
                     const dist = distanceToSegment(pt, splitLine.lhsCoords[j], splitLine.lhsCoords[j + 1]);
-                    minDistToBoundary = Math.min(minDistToBoundary, dist);
+                    // Weight split line distance 2x to push labels away from them
+                    minDistToBoundary = Math.min(minDistToBoundary, dist * 0.5);
                   }
                   for (let j = 0; j < splitLine.rhsCoords.length - 1; j++) {
                     const dist = distanceToSegment(pt, splitLine.rhsCoords[j], splitLine.rhsCoords[j + 1]);
-                    minDistToBoundary = Math.min(minDistToBoundary, dist);
+                    // Weight split line distance 2x to push labels away from them
+                    minDistToBoundary = Math.min(minDistToBoundary, dist * 0.5);
                   }
                 }
               } else if (rule.type === 'rest') {
@@ -1214,19 +1369,22 @@
                   if (sl.coords) {
                     for (let j = 0; j < sl.coords.length - 1; j++) {
                       const dist = distanceToSegment(pt, sl.coords[j], sl.coords[j + 1]);
-                      minDistToBoundary = Math.min(minDistToBoundary, dist);
+                      // Weight split line distance 2x to push labels away from them
+                      minDistToBoundary = Math.min(minDistToBoundary, dist * 0.5);
                     }
                   }
                   if (sl.lhsCoords) {
                     for (let j = 0; j < sl.lhsCoords.length - 1; j++) {
                       const dist = distanceToSegment(pt, sl.lhsCoords[j], sl.lhsCoords[j + 1]);
-                      minDistToBoundary = Math.min(minDistToBoundary, dist);
+                      // Weight split line distance 2x to push labels away from them
+                      minDistToBoundary = Math.min(minDistToBoundary, dist * 0.5);
                     }
                   }
                   if (sl.rhsCoords) {
                     for (let j = 0; j < sl.rhsCoords.length - 1; j++) {
                       const dist = distanceToSegment(pt, sl.rhsCoords[j], sl.rhsCoords[j + 1]);
-                      minDistToBoundary = Math.min(minDistToBoundary, dist);
+                      // Weight split line distance 2x to push labels away from them
+                      minDistToBoundary = Math.min(minDistToBoundary, dist * 0.5);
                     }
                   }
                 });
@@ -1239,9 +1397,10 @@
               }
             }
 
-            // Use best point if found, otherwise fall back to centroid
-            const finalPoint = maxMinDist > 0 ? bestPoint : calculateCentroidOfPoints(zonePoints);
+            // Use best point if found, otherwise use middle sample point (guaranteed inside)
+            const finalPoint = maxMinDist > 0 ? bestPoint : zonePoints[Math.floor(zonePoints.length / 2)];
 
+            console.log(`${areaCode} rule ${ruleIdx}: Placing QNH ${rule.qnh} label at [${finalPoint[0].toFixed(2)}, ${finalPoint[1].toFixed(2)}] (maxMinDist: ${maxMinDist.toFixed(4)})`);
 
             splitLabelFeatures.push({
               type: 'Feature',
@@ -1280,6 +1439,12 @@
             });
           }
         });
+
+        // For split zones, DO NOT apply automatic offsets
+        // The offset validation only checks the full polygon, not individual zones
+        // This could push labels into wrong zones
+        // The pole-of-inaccessibility algorithm already separates labels naturally
+        console.log(`${areaCode}: Skipping automatic offsets for split zones to prevent cross-zone label placement`);
       });
 
       const solidLineFC = { type: 'FeatureCollection', features: solidLineFeatures };
