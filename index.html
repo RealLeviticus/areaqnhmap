@@ -13,6 +13,9 @@
       --warn-bg: #fff4d7;
       --warn-border: #f0c96a;
       --warn-text: #7a5a05;
+      --success-bg: #d4edda;
+      --success-border: #c3e6cb;
+      --success-text: #155724;
     }
     body {
       margin: 0;
@@ -46,7 +49,7 @@
       display: flex;
       flex-direction: column;
     }
-    #warning {
+    #warning, #success {
       margin-bottom: 12px;
       padding: 10px 12px;
       border: 1px solid var(--warn-border);
@@ -55,6 +58,11 @@
       color: var(--warn-text);
       font-size: 0.95rem;
       display: none;
+    }
+    #success {
+      background: var(--success-bg);
+      border-color: var(--success-border);
+      color: var(--success-text);
     }
     #map {
       width: 100%;
@@ -66,6 +74,43 @@
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
       background: #edf1f5;
     }
+    .legend {
+      position: absolute;
+      bottom: 30px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      font-size: 0.85rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1;
+    }
+    .legend h4 {
+      margin: 0 0 8px 0;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 4px 0;
+    }
+    .legend-line {
+      width: 24px;
+      height: 3px;
+      background: #1f9e45;
+    }
+    .legend-point {
+      width: 16px;
+      height: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
@@ -74,27 +119,49 @@
       <h1>Area QNH Map</h1>
       <p class="sub">Replica of the BOM Area QNH Map removed from the new BOM website.</p>
     </div>
-    <div id="validity">Fetching QNH</div>
+    <div id="validity">Fetching QNH...</div>
   </header>
 
   <main>
     <div id="warning" role="status" aria-live="polite"></div>
-    <div id="map" aria-label="Area QNH map"></div>
+    <div id="success" role="status" aria-live="polite"></div>
+    <div id="map" aria-label="Area QNH map">
+      <div class="legend">
+        <h4>Legend</h4>
+        <div class="legend-item">
+          <div class="legend-line"></div>
+          <span>Split boundary</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-point">×</div>
+          <span>Reference point</span>
+        </div>
+      </div>
+    </div>
   </main>
 
   <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
   <script>
     const warningBox = document.getElementById('warning');
+    const successBox = document.getElementById('success');
+    
     const showWarning = (message) => {
       if (!message) return;
       warningBox.textContent = message;
       warningBox.style.display = 'block';
+      setTimeout(() => warningBox.style.display = 'none', 8000);
+    };
+
+    const showSuccess = (message) => {
+      if (!message) return;
+      successBox.textContent = message;
+      successBox.style.display = 'block';
+      setTimeout(() => successBox.style.display = 'none', 5000);
     };
 
     const QNH_WORKER_URL = 'https://areaqnh.therealleviticus.workers.dev/';
     const NAV_INDEX_URL = 'https://airspace.therealleviticus.workers.dev/';
 
-    // Inline GAF area polygons so the page works from file:// or any host
     const AREA_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"area_code":"AREA-20","name":"QNH_AREA_20","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[148.383333,-32.75],[150.0,-29.0],[154.703056,-28.043611],[155.0,-28.833333],[152.666667,-34.333333],[151.177222,-33.946111],[150.988333,-33.924444],[149.651944,-33.409444],[148.383333,-32.75]]]}},{"type":"Feature","properties":{"area_code":"AREA-21","name":"QNH_AREA_21","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[146.924722,-36.195278],[148.383333,-32.75],[149.651944,-33.409444],[150.988333,-33.924444],[151.177222,-33.946111],[152.666667,-34.333333],[150.870556,-37.881111],[149.976111,-37.503889],[146.924722,-36.195278]]]}},{"type":"Feature","properties":{"area_code":"AREA-22","name":"QNH_AREA_22","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-29.0],[150.0,-29.0],[148.383333,-32.75],[146.924722,-36.195278],[141.0,-33.65],[141.0,-29.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-24","name":"QNH_AREA_24","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[152.666667,-34.333333],[155.0,-28.833333],[163.0,-28.5],[163.0,-31.333333],[152.666667,-34.333333]]]}},{"type":"Feature","properties":{"area_code":"AREA-30","name":"QNH_AREA_30","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-33.65],[146.924722,-36.195278],[149.976111,-37.503889],[150.870556,-37.881111],[150.2,-39.57],[142.8575,-39.57],[141.0,-39.57],[141.0,-33.65]]]}},{"type":"Feature","properties":{"area_code":"AREA-40","name":"QNH_AREA_40","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[147.820833,-23.156111],[152.864444,-23.155833],[154.703056,-28.043611],[150.0,-29.0],[148.183333,-23.566667],[147.820833,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-41","name":"QNH_AREA_41","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[138.0,-26.0],[138.0,-23.156111],[147.820833,-23.156111],[148.183333,-23.566667],[150.0,-29.0],[141.0,-29.0],[141.0,-26.0],[138.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-43","name":"QNH_AREA_43","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[138.0,-23.156111],[138.0,-19.0],[143.533333,-18.3],[147.820833,-23.156111],[138.0,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-44","name":"QNH_AREA_44","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[143.533333,-18.3],[148.0,-18.283333],[152.864444,-23.155833],[147.820833,-23.156111],[143.533333,-18.3]]]}},{"type":"Feature","properties":{"area_code":"AREA-45","name":"QNH_AREA_45","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-9.833333],[141.033333,-9.616667],[142.083333,-9.261667],[142.805,-9.323889],[143.875,-9.133333],[144.233333,-9.4],[144.089167,-9.942778],[144.026667,-11.5],[144.072222,-11.725],[144.0,-12.0],[147.607778,-16.995833],[148.0,-18.283333],[143.533333,-18.3],[138.0,-19.0],[138.0,-14.0],[141.0,-9.833333]]]}},{"type":"Feature","properties":{"area_code":"AREA-50","name":"QNH_AREA_50","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[134.5,-35.5],[135.372222,-34.686667],[137.716667,-32.5],[141.0,-33.65],[141.0,-39.57],[134.5,-35.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-51","name":"QNH_AREA_51","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[135.0,-30.0],[141.0,-29.0],[141.0,-33.65],[137.716667,-32.5],[135.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-52","name":"QNH_AREA_52","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-26.0],[138.0,-26.0],[141.0,-26.0],[141.0,-29.0],[135.0,-30.0],[129.0,-30.0],[129.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-53","name":"QNH_AREA_53","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-30.0],[135.0,-30.0],[137.716667,-32.5],[135.372222,-34.686667],[134.5,-35.5],[131.0,-32.5],[129.0,-33.0],[129.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-60","name":"QNH_AREA_60","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.5,-27.5],[118.0,-27.5],[119.0,-32.25],[113.5,-33.5],[112.5,-27.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-61","name":"QNH_AREA_61","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[119.0,-32.25],[118.0,-27.5],[123.5,-27.5],[123.618333,-30.84],[119.0,-32.25]]]}},{"type":"Feature","properties":{"area_code":"AREA-62","name":"QNH_AREA_62","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.618333,-30.84],[129.0,-30.0],[129.0,-33.0],[123.5,-35.0],[123.618333,-30.84]]]}},{"type":"Feature","properties":{"area_code":"AREA-63","name":"QNH_AREA_63","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[113.5,-33.5],[119.0,-32.25],[123.618333,-30.84],[123.5,-35.0],[116.0,-36.25],[113.5,-33.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-64","name":"QNH_AREA_64","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.5,-23.88],[129.0,-23.88],[129.0,-30.0],[123.618333,-30.84],[123.5,-27.5],[123.5,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-65","name":"QNH_AREA_65","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.096944,-23.88],[115.984722,-23.88],[118.0,-27.5],[112.5,-27.5],[112.096944,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-66","name":"QNH_AREA_66","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[115.984722,-23.88],[123.5,-23.88],[123.5,-27.5],[118.0,-27.5],[115.984722,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-68","name":"QNH_AREA_68","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.0,-23.0],[113.0,-21.0],[117.0,-18.0],[120.0,-18.0],[123.5,-20.5],[123.5,-23.88],[115.984722,-23.88],[112.096944,-23.88],[112.0,-23.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-69","name":"QNH_AREA_69","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[117.0,-18.0],[124.0,-14.0],[126.148056,-13.751667],[127.5,-14.0],[128.416667,-14.833333],[129.0,-14.879444],[129.0,-20.0],[123.5,-20.5],[120.0,-18.0],[117.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-70","name":"QNH_AREA_70","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[142.8575,-39.57],[150.2,-39.57],[149.0,-43.0],[147.5,-44.5],[145.0,-44.0],[142.8575,-39.57]]]}},{"type":"Feature","properties":{"area_code":"AREA-80","name":"QNH_AREA_80","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-9.409722],[141.0,-9.833333],[138.0,-14.0],[138.0,-19.0],[129.0,-15.884444],[129.0,-14.879444],[129.0,-9.409722]]]}},{"type":"Feature","properties":{"area_code":"AREA-83","name":"QNH_AREA_83","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.5,-20.5],[129.0,-20.0],[129.0,-23.88],[123.5,-23.88],[123.5,-20.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-84","name":"QNH_AREA_84","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-20.0],[129.0,-15.884444],[138.0,-19.0],[138.0,-23.156111],[129.0,-22.25],[129.0,-20.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-85","name":"QNH_AREA_85","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-23.88],[129.0,-22.25],[138.0,-23.156111],[138.0,-26.0],[129.0,-26.0],[129.0,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-86","name":"QNH_AREA_86","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[124.774444,-10.9125],[126.833333,-9.333333],[129.0,-9.409722],[129.0,-14.879444],[128.416667,-14.833333],[127.5,-14.0],[126.148056,-13.751667],[124.0,-14.0],[124.774444,-10.9125]]]}},{"type":"Feature","properties":{"area_code":"AREA-87","name":"QNH_AREA_87","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.0,-18.0],[118.0,-15.0],[124.0,-14.0],[117.0,-18.0],[112.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-88","name":"QNH_AREA_88","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[110.0,-19.0],[112.0,-18.0],[117.0,-18.0],[113.0,-21.0],[110.0,-19.0]]]}}]};
 
     let areaGeoJSON = null;
@@ -102,9 +169,6 @@
     let areaSplits = {};
     let navPointMap = {};
     let navIndexPromise = null;
-    let zoneFeatureIdCounter = 1;
-    let selectedZoneId = null;
-    let zoneClickBound = false;
 
     const map = new maplibregl.Map({
       container: 'map',
@@ -116,11 +180,10 @@
             type: 'raster',
             tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
             tileSize: 256,
-            attribution: ' OpenStreetMap contributors'
+            attribution: '© OpenStreetMap contributors'
           }
         },
-        layers: [{ id: 'osm-base', type: 'raster', source: 'osm' }],
-        "text-font": ["Noto Sans Regular"]
+        layers: [{ id: 'osm-base', type: 'raster', source: 'osm' }]
       },
       center: [134.5, -25.5],
       zoom: 3.6
@@ -131,10 +194,10 @@
     map.on('error', (e) => {
       const { resourceType, sourceId } = e || {};
       if (resourceType === 'glyphs') {
-        showWarning('Map labels may be missing because glyphs could not be loaded (possible offline or blocked network).');
+        showWarning('Map labels may be missing due to font loading issues.');
       }
       if (resourceType === 'tile' && sourceId === 'osm') {
-        showWarning('Base map tiles failed to load. Polygons will still render, check connectivity or tile access.');
+        showWarning('Base map tiles failed to load. Check network connectivity.');
       }
     });
 
@@ -173,7 +236,7 @@
           'text-field': [
             'format',
             ['to-string', ['coalesce', ['get', 'qnh'], '']],
-            { 'font-scale': 1.0, 'text-color': '#000' },
+            { 'font-scale': 1.0 },
             '\n',
             ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
             { 'font-scale': 0.7, 'text-color': '#c40000' }
@@ -182,7 +245,6 @@
           'text-size': 18,
           'text-allow-overlap': true,
           'text-ignore-placement': true,
-          'text-variable-anchor': ['center'],
           'symbol-z-order': 'source'
         },
         paint: {
@@ -196,48 +258,60 @@
     }
 
     function applyAreaQnhToPolygons() {
-      if (!areaGeoJSON || !areaGeoJSON.features) return;
+      if (!areaGeoJSON?.features) return;
       const qnhMap = areaQnhMap || {};
 
       areaGeoJSON.features.forEach((feature) => {
         const code = (feature.properties?.area_code || '').toUpperCase();
         const entry = qnhMap[code];
-        feature.properties.qnh = entry ? entry.qnh : null;
+        const splits = areaSplits[code];
+
+        // Hide main QNH if this area has splits
+        if (splits?.length) {
+          feature.properties.qnh = null; // Hide main QNH
+          feature.properties.hasSplit = true;
+          feature.properties.splitCount = splits.length;
+        } else {
+          feature.properties.qnh = entry ? entry.qnh : null;
+          feature.properties.hasSplit = false;
+          feature.properties.splitCount = 0;
+        }
       });
 
-      const source = map.getSource && map.getSource('areas');
-      if (source && source.setData) {
+      const source = map.getSource('areas');
+      if (source?.setData) {
         source.setData(areaGeoJSON);
       }
     }
 
     function fitToAreas(geojson) {
       const features = geojson?.features;
-      if (!features || !features.length || !map || typeof map.fitBounds !== 'function') return;
+      if (!features?.length || !map?.fitBounds) return;
 
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 
-      const add = (coord) => {
+      const processCoord = (coord) => {
         if (!Array.isArray(coord) || coord.length < 2) return;
         const [x, y] = coord;
         if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
       };
 
       const walk = (coords) => {
         if (!Array.isArray(coords)) return;
         if (typeof coords[0] === 'number') {
-          add(coords);
+          processCoord(coords);
           return;
         }
         coords.forEach(walk);
       };
 
       features.forEach(f => walk(f.geometry?.coordinates));
-      if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return;
+      
+      if (!Number.isFinite(minX) || !Number.isFinite(maxX)) return;
 
       const bounds = new maplibregl.LngLatBounds([minX, minY], [maxX, maxY]);
       map.fitBounds(bounds, { padding: 24, maxZoom: 6, duration: 400 });
@@ -251,49 +325,61 @@
     async function fetchAndDrawQNH() {
       const validityBox = document.getElementById('validity');
       try {
+        validityBox.textContent = 'Fetching QNH data...';
+        
         const res = await fetch(QNH_WORKER_URL + '?t=' + Date.now(), { cache: 'no-store' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const raw = await res.text();
 
-        let text = raw
-          .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-          .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-          .replace(/<br\s*\/?/gi, '\n')
-          .replace(/<\/(p|div|li|h\d|section)>/gi, '\n')
-          .replace(/<[^>]+>/g, ' ')
-          .replace(/&nbsp;/g, ' ')
-          .replace(/&amp;/g, '&')
-          .replace(/&lt;/g, '<')
-          .replace(/&gt;/g, '>')
-          .replace(/[ \t]+\n/g, '\n')
-          .replace(/\n[ \t]+/g, '\n')
-          .replace(/\n{3,}/g, '\n\n')
-          .trim();
-
+        const text = sanitizeHTML(raw);
         const parsed = parseQNHText(text);
+        
         areaQnhMap = parsed.areaQnhMap;
         areaSplits = parsed.areaSplits;
+        
         await ensureNavIndex();
         applyAreaQnhToPolygons();
-        drawGreenLines();
+        drawSplitLines();
 
         const v = parsed.validIssued;
         const areaCount = Object.keys(parsed.areaQnhMap || {}).length;
         const totalAreas = areaGeoJSON?.features?.length || '?';
+        const splitCount = Object.keys(parsed.areaSplits || {}).length;
+        
         validityBox.textContent = v
-          ? `Valid: ${v.valid}  Issued: ${v.issued}  Areas ${areaCount}/${totalAreas}`
-          : `Validity unknown  Areas ${areaCount}/${totalAreas}`;
+          ? `Valid: ${v.valid} | Issued: ${v.issued} | Areas: ${areaCount}/${totalAreas}${splitCount ? ` (${splitCount} split)` : ''}`
+          : `Areas: ${areaCount}/${totalAreas}${splitCount ? ` (${splitCount} split)` : ''}`;
+          
+        showSuccess(`QNH data updated successfully (${areaCount} areas, ${splitCount} with splits)`);
       } catch (err) {
-        console.error('Failed to fetch/parse QNH', err);
-        document.getElementById('validity').textContent = 'Failed to fetch QNH';
-        showWarning('QNH fetch failed  latest values unavailable.');
+        console.error('Failed to fetch/parse QNH:', err);
+        validityBox.textContent = 'Failed to fetch QNH data';
+        showWarning('QNH fetch failed - latest values unavailable. Will retry in 15 minutes.');
       }
+    }
+
+    function sanitizeHTML(html) {
+      return html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/<\/(p|div|li|h\d|section)>/gi, '\n')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/[ \t]+\n/g, '\n')
+        .replace(/\n[ \t]+/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
     }
 
     function parseQNHText(text) {
       const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
       const blocks = [];
       let current = null;
+
       for (const line of lines) {
         const m = line.match(/^(?:AREA|Area)\s*(\d+)\s*:(.*)$/);
         if (m) {
@@ -314,6 +400,7 @@
 
       const areaQnhMapLocal = {};
       const areaSplitsLocal = {};
+
       for (const b of blocks) {
         const txt = b.lines.join(' ');
         const matches = [...txt.matchAll(/\b(\d{4})\b/g)].map(m => Number(m[1]));
@@ -327,7 +414,6 @@
         while ((match = betweenRegex.exec(txt)) !== null) {
           rules.push({
             type: 'between',
-            raw: match[0],
             lhs: match[1].replace(/[.,;]+$/g, '').trim(),
             rhs: match[2].replace(/[.,;]+$/g, '').trim(),
             qnh: Number(match[3])
@@ -338,10 +424,8 @@
         while ((match = ofRegex.exec(txt)) !== null) {
           rules.push({
             type: 'of',
-            raw: match[0],
             dir: match[1].toUpperCase(),
             lhs: match[2].replace(/[.,;]+$/g, '').trim(),
-            rhs: '',
             qnh: Number(match[3])
           });
         }
@@ -350,7 +434,6 @@
         while ((match = restRegex.exec(txt)) !== null) {
           rules.push({
             type: 'rest',
-            raw: match[0],
             qnh: Number(match[1])
           });
         }
@@ -395,6 +478,7 @@
           const pos = node.getAttribute('Position') || node.textContent?.trim();
           const coord = parseAirspacePoint(pos);
           if (!coord) return;
+          
           const icao = node.getAttribute('ICAO');
           const name = node.getAttribute('Name');
           const full = node.getAttribute('FullName');
@@ -403,10 +487,11 @@
           });
         });
 
+        console.log(`Loaded ${Object.keys(navPointMap).length} navigation points`);
         return navPointMap;
       } catch (err) {
-        console.error('Failed to load nav index', err);
-        showWarning('Could not load nav index for green split lines.');
+        console.error('Failed to load nav index:', err);
+        showWarning('Could not load navigation index - split line reference points may not display.');
         return navPointMap;
       }
     }
@@ -432,35 +517,32 @@
       return sign * (deg + min / 60 + sec / 3600);
     }
 
-    function parseLatLonToken(token) {
-      const m = token.match(/^(\d{1,2})([NS])(\d{1,3})([EW])$/i);
-      if (!m) return null;
-      const latDeg = Number(m[1]);
-      const lonDeg = Number(m[3]);
-      const lat = (m[2].toUpperCase() === 'S' ? -1 : 1) * latDeg;
-      const lon = (m[4].toUpperCase() === 'W' ? -1 : 1) * lonDeg;
-      return [lon, lat];
-    }
-
-    function parseLatLonTokenWithMin(token) {
-      const m = token.match(/^(\d{1,2})(\d{2})([NS])(\d{1,3})(\d{2})([EW])$/i);
-      if (!m) return null;
-      const latDeg = Number(m[1]);
-      const latMin = Number(m[2]);
-      const lonDeg = Number(m[4]);
-      const lonMin = Number(m[5]);
-      const lat = (m[3].toUpperCase() === 'S' ? -1 : 1) * (latDeg + latMin / 60);
-      const lon = (m[6].toUpperCase() === 'W' ? -1 : 1) * (lonDeg + lonMin / 60);
-      return [lon, lat];
-    }
-
     function resolveTokenToCoord(token) {
       if (!token) return null;
       const trimmed = token.trim();
-      const coordFromToken = parseLatLonToken(trimmed);
-      if (coordFromToken) return { coord: coordFromToken, name: trimmed.toUpperCase() };
-      const coordWithMin = parseLatLonTokenWithMin(trimmed);
-      if (coordWithMin) return { coord: coordWithMin, name: trimmed.toUpperCase() };
+      
+      const patterns = [
+        /^(\d{1,2})([NS])(\d{1,3})([EW])$/i,
+        /^(\d{1,2})(\d{2})([NS])(\d{1,3})(\d{2})([EW])$/i
+      ];
+      
+      for (const pattern of patterns) {
+        const m = trimmed.match(pattern);
+        if (m) {
+          const hasMin = m.length > 5;
+          const latDeg = Number(m[1]);
+          const latMin = hasMin ? Number(m[2]) : 0;
+          const lonDeg = hasMin ? Number(m[4]) : Number(m[3]);
+          const lonMin = hasMin ? Number(m[5]) : 0;
+          const latDir = hasMin ? m[3] : m[2];
+          const lonDir = hasMin ? m[6] : m[4];
+          
+          const lat = (latDir.toUpperCase() === 'S' ? -1 : 1) * (latDeg + latMin / 60);
+          const lon = (lonDir.toUpperCase() === 'W' ? -1 : 1) * (lonDeg + lonMin / 60);
+          return { coord: [lon, lat], name: trimmed.toUpperCase() };
+        }
+      }
+      
       const lookup = navPointMap[trimmed.toUpperCase()];
       return lookup ? { coord: lookup, name: trimmed.toUpperCase() } : null;
     }
@@ -473,622 +555,170 @@
         .filter(t => t && !skip.has(t.toUpperCase()));
     }
 
-    const EXTEND_SPLIT_LINE_START = true;
-    const EXTEND_SPLIT_LINE_END = true;
+    // Helper function to generate sample points within a polygon
+    function generateSamplePoints(ring, gridSize = 20) {
+      if (!ring || ring.length < 3) return [];
 
-    const EPS = 1e-10;
-    const MIN_RING_AREA = 1e-9;
+      // Find bounding box
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      ring.forEach(([x, y]) => {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      });
 
-    function pointInPolygon(point, ring) {
-      const x = point[0], y = point[1];
+      const width = maxX - minX;
+      const height = maxY - minY;
+      const stepX = width / gridSize;
+      const stepY = height / gridSize;
+
+      const points = [];
+      for (let i = 0; i <= gridSize; i++) {
+        for (let j = 0; j <= gridSize; j++) {
+          const x = minX + i * stepX;
+          const y = minY + j * stepY;
+          const point = [x, y];
+
+          // Check if point is inside polygon
+          if (pointInPolygonHelper(point, ring)) {
+            points.push(point);
+          }
+        }
+      }
+
+      return points;
+    }
+
+    function pointInPolygonHelper(point, ring) {
+      const [x, y] = point;
       let inside = false;
       for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const xi = ring[i][0], yi = ring[i][1];
-        const xj = ring[j][0], yj = ring[j][1];
+        const [xi, yi] = ring[i];
+        const [xj, yj] = ring[j];
         const intersect = ((yi > y) !== (yj > y)) &&
-          (x < (xj - xi) * (y - yi) / ((yj - yi) || EPS) + xi);
+          (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
         if (intersect) inside = !inside;
       }
       return inside;
     }
 
-    function pointInPolygonWithHoles(point, polyObj) {
-      if (!polyObj) return false;
-      const outer = polyObj.outer || polyObj;
-      const holes = polyObj.holes || [];
-      if (!pointInPolygon(point, outer)) return false;
-      return !holes.some(h => pointInPolygon(point, h));
-    }
-
-    function ringSignedArea(ring) {
-      if (!ring || ring.length < 3) return 0;
-      let area = 0;
-      for (let i = 0; i < ring.length - 1; i++) {
-        const [x1, y1] = ring[i];
-        const [x2, y2] = ring[i + 1];
-        area += x1 * y2 - x2 * y1;
-      }
-      return area / 2;
-    }
-
-    function ensureClosedRing(ring) {
-      if (!ring || !ring.length) return [];
-      const closed = ring.slice();
-      const first = closed[0];
-      const last = closed[closed.length - 1];
-      if (Math.abs(first[0] - last[0]) > EPS || Math.abs(first[1] - last[1]) > EPS) {
-        closed.push([first[0], first[1]]);
-      }
-      return closed;
-    }
-
-    function sanitizeRing(ring) {
-      const closed = ensureClosedRing(ring || []);
-      if (closed.length < 4) return [];
-      const dedup = [closed[0]];
-      for (let i = 1; i < closed.length; i++) {
-        const p = closed[i];
-        const prev = dedup[dedup.length - 1];
-        if (Math.hypot(p[0] - prev[0], p[1] - prev[1]) > 1e-12) dedup.push(p);
-      }
-      const finalRing = ensureClosedRing(dedup);
-      const area = Math.abs(ringSignedArea(finalRing));
-      return (finalRing.length >= 4 && area > MIN_RING_AREA) ? finalRing : [];
-    }
-
-    function polygonKey(ring) {
-      const oriented = orientRing(sanitizeRing(ring), false);
-      if (!oriented.length) return '';
-      const pts = oriented.slice(0, -1); // drop closing duplicate for key
-      let start = 0;
-      for (let i = 1; i < pts.length; i++) {
-        const a = pts[i], b = pts[start];
-        if (a[0] < b[0] - 1e-9 || (Math.abs(a[0] - b[0]) < 1e-9 && a[1] < b[1] - 1e-9)) start = i;
-      }
-      const ordered = [];
-      for (let i = 0; i < pts.length; i++) {
-        ordered.push(pts[(start + i) % pts.length]);
-      }
-      return ordered.map(p => `${p[0].toFixed(6)},${p[1].toFixed(6)}`).join('|');
-    }
-
-    function polylineSideMatches(pt, coords, samplePoint) {
-      if (!coords || coords.length < 2 || !samplePoint) return false;
-      const sp = samplePoint;
-      for (let i = 0; i < coords.length - 1; i++) {
-        const a = coords[i];
-        const b = coords[i + 1];
-        const keepPositive = signedSide(sp, a, b) >= 0;
-        const side = signedSide(pt, a, b);
-        if (keepPositive ? side < -EPS : side > EPS) return false;
-      }
-      return true;
-    }
-
-    function orientRing(ring, clockwise = false) {
-      const closed = ensureClosedRing(ring);
-      const area = ringSignedArea(closed);
-      const isClockwise = area < 0;
-      if (clockwise === isClockwise) return closed;
-      const body = closed.slice(0, -1).reverse();
-      return ensureClosedRing(body);
-    }
-
-    function safeInteriorPoint(ring) {
-      if (!ring || ring.length < 3) return null;
-      const best = bestInteriorPoint(ring, null);
-      if (best) return best;
-      const c = polygonCentroid(ring);
-      return pushInsidePolygon(c, ring, c);
-    }
-
-    // Build planar faces from segments covering an area ring
-    // Faces/planar subdivision removed; only green line rendering remains
-
-    function signedSide(p, a, b) {
-      return (b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]);
-    }
-
-    function intersectSegmentWithLine(p1, p2, a, b) {
-      const r = [p2[0] - p1[0], p2[1] - p1[1]];
-      const s = [b[0] - a[0], b[1] - a[1]];
-      const denom = r[0] * s[1] - r[1] * s[0];
-      if (Math.abs(denom) < EPS) return null;
-      const qp = [a[0] - p1[0], a[1] - p1[1]];
-      const t = (qp[0] * s[1] - qp[1] * s[0]) / denom;
-      if (t < -EPS || t > 1 + EPS) return null;
-      return [p1[0] + t * r[0], p1[1] + t * r[1]];
-    }
-
-    function segIntersect(p, p2, q, q2) {
-      const r = [p2[0] - p[0], p2[1] - p[1]];
-      const s = [q2[0] - q[0], q2[1] - q[1]];
-      const denom = r[0] * s[1] - r[1] * s[0];
-      if (Math.abs(denom) < EPS) return null;
-      const qp = [q[0] - p[0], q[1] - p[1]];
-      const t = (qp[0] * s[1] - qp[1] * s[0]) / denom;
-      const u = (qp[0] * r[1] - qp[1] * r[0]) / denom;
-      if (t < -EPS || t > 1 + EPS || u < -EPS || u > 1 + EPS) return null;
-      const pt = [p[0] + t * r[0], p[1] + t * r[1]];
-      return { t, u, pt };
-    }
-
-    function rayIntersectPolygon(origin, dir, ring) {
-      const far = [origin[0] + dir[0] * 1e6, origin[1] + dir[1] * 1e6];
-      let bestT = Infinity;
-      let best = null;
-      for (let i = 0; i < ring.length - 1; i++) {
-        const a = ring[i];
-        const b = ring[i + 1];
-        const hit = segIntersect(origin, far, a, b);
-        if (!hit) continue;
-
-        // Tightened threshold so we do not skip legitimate border hits near the start point
-        if (hit.t > 1e-12 && hit.t < bestT) {
-          bestT = hit.t;
-          best = hit.pt;
-        }
-      }
-      return best;
-    }
-
-    function clipSegmentToPolygon(p1, p2, ring) {
-      const pts = [{ t: 0, pt: p1 }, { t: 1, pt: p2 }];
-      for (let i = 0; i < ring.length - 1; i++) {
-        const a = ring[i];
-        const b = ring[i + 1];
-        const hit = segIntersect(p1, p2, a, b);
-        if (hit) {
-          const tClamped = Math.max(0, Math.min(1, hit.t));
-          pts.push({ t: tClamped, pt: hit.pt });
-        }
-      }
-
-      pts.sort((x, y) => x.t - y.t);
-      const dedup = [];
-      for (const p of pts) {
-        if (!dedup.length || Math.abs(dedup[dedup.length - 1].t - p.t) > 1e-7) {
-          dedup.push(p);
-        }
-      }
-
-      const segs = [];
-      for (let i = 0; i < dedup.length - 1; i++) {
-        const a = dedup[i].pt;
-        const b = dedup[i + 1].pt;
-        const mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
-        if (pointInPolygon(mid, ring)) {
-          segs.push([a, b]);
-        }
-      }
-      return segs;
-    }
-
-    function clipPolylineToPolygon(coords, ring) {
-      const out = [];
-      for (let i = 0; i < coords.length - 1; i++) {
-        const p1 = coords[i];
-        const p2 = coords[i + 1];
-        const segs = clipSegmentToPolygon(p1, p2, ring);
-        segs.forEach(seg => out.push(seg));
-      }
-      return out;
-    }
-
-    function normalise(v) {
-      const m = Math.hypot(v[0], v[1]);
-      if (m < EPS) return [0, 0];
-      return [v[0] / m, v[1] / m];
-    }
-
-    function extendPolylineToBorders(coords, ring) {
-      const extended = coords.slice();
-      if (extended.length < 2) return extended;
-
-      if (EXTEND_SPLIT_LINE_START) {
-        const a = extended[0];
-        const b = extended[1];
-        const dir = normalise([a[0] - b[0], a[1] - b[1]]);
-        const hit = rayIntersectPolygon(a, dir, ring);
-        if (hit) extended.unshift(hit);
-      }
-
-      if (EXTEND_SPLIT_LINE_END) {
-        const n = extended.length;
-        const a = extended[n - 2];
-        const b = extended[n - 1];
-        const dir = normalise([b[0] - a[0], b[1] - a[1]]);
-        const hit = rayIntersectPolygon(b, dir, ring);
-        if (hit) extended.push(hit);
-      }
-
-      return extended;
-    }
-
-    function polygonCentroid(ring) {
-      let area = 0;
-      let cx = 0;
-      let cy = 0;
-      for (let i = 0; i < ring.length - 1; i++) {
-        const [x0, y0] = ring[i];
-        const [x1, y1] = ring[i + 1];
-        const a = x0 * y1 - x1 * y0;
-        area += a;
-        cx += (x0 + x1) * a;
-        cy += (y0 + y1) * a;
-      }
-      area *= 0.5;
-      if (Math.abs(area) < EPS) {
-        const xs = ring.map(p => p[0]);
-        const ys = ring.map(p => p[1]);
-        return [xs.reduce((s, v) => s + v, 0) / xs.length, ys.reduce((s, v) => s + v, 0) / ys.length];
-      }
-      cx /= (6 * area);
-      cy /= (6 * area);
-      return [cx, cy];
-    }
-
-    function pushInsidePolygon(candidate, ring, fallback) {
-      if (pointInPolygon(candidate, ring)) return candidate;
-      const steps = 20;
-      for (let i = 1; i <= steps; i++) {
-        const t = i / steps;
-        const p = [candidate[0] + (fallback[0] - candidate[0]) * t, candidate[1] + (fallback[1] - candidate[1]) * t];
-        if (pointInPolygon(p, ring)) return p;
-      }
-      return fallback;
-    }
-
-    function ringBounds(ring) {
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      ring.forEach(([x, y]) => {
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
+    function calculateCentroidOfPoints(points) {
+      if (!points || points.length === 0) return [0, 0];
+      let sumX = 0, sumY = 0;
+      points.forEach(([x, y]) => {
+        sumX += x;
+        sumY += y;
       });
-      return { minX, minY, maxX, maxY };
+      return [sumX / points.length, sumY / points.length];
     }
 
-    function getRingBBox(ring) {
-      if (!ring || !ring.length) return { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
-      return ringBounds(ring);
+    // Determine if a point is on the specified directional side of a line
+    function isPointOnDirectionSideOfLine(point, lineCoords, direction) {
+      if (!lineCoords || lineCoords.length < 2) return false;
+
+      const dir = direction.toUpperCase();
+
+      // Use the first and last points to define the line
+      const p1 = lineCoords[0];
+      const p2 = lineCoords[lineCoords.length - 1];
+
+      // Calculate line vector
+      const dx = p2[0] - p1[0];
+      const dy = p2[1] - p1[1];
+
+      // Calculate vector from line start to point
+      const px = point[0] - p1[0];
+      const py = point[1] - p1[1];
+
+      // Cross product to determine which side of line the point is on
+      // Positive = left side (when looking from p1 to p2)
+      // Negative = right side
+      const cross = px * dy - py * dx;
+
+      // Calculate the angle of the line (in radians)
+      const lineAngle = Math.atan2(dy, dx);
+
+      // Calculate the angle to the compass direction (in radians)
+      // 0 = East, PI/2 = North, PI = West, -PI/2 = South
+      let dirAngle;
+      if (dir === 'N') dirAngle = Math.PI / 2;
+      else if (dir === 'S') dirAngle = -Math.PI / 2;
+      else if (dir === 'E') dirAngle = 0;
+      else if (dir === 'W') dirAngle = Math.PI;
+      else if (dir === 'NE') dirAngle = Math.PI / 4;
+      else if (dir === 'NW') dirAngle = 3 * Math.PI / 4;
+      else if (dir === 'SE') dirAngle = -Math.PI / 4;
+      else if (dir === 'SW') dirAngle = -3 * Math.PI / 4;
+      else return cross > 0; // Default for unknown directions
+
+      // Calculate the angle from the line to the compass direction
+      // Normalize to -PI to PI range
+      let angleDiff = dirAngle - lineAngle;
+      while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
+      while (angleDiff < -Math.PI) angleDiff += 2 * Math.PI;
+
+      // If the angle difference is between -PI/2 and PI/2, the direction is on the left side
+      // Otherwise, it's on the right side
+      const directionIsLeft = angleDiff > -Math.PI / 2 && angleDiff < Math.PI / 2;
+
+      // Return true if the point is on the same side as the compass direction
+      return directionIsLeft ? cross > 0 : cross < 0;
     }
 
-    function pointInAnyPolygon(pt, polygons) {
-      return polygons.some(poly => pointInPolygon(pt, poly));
+    // Calculate cross product to determine which side of a line a point is on
+    function calculateLineCross(point, lineCoords) {
+      if (!lineCoords || lineCoords.length < 2) return 0;
+
+      const p1 = lineCoords[0];
+      const p2 = lineCoords[lineCoords.length - 1];
+      const dx = p2[0] - p1[0];
+      const dy = p2[1] - p1[1];
+
+      // Cross product: positive = left side, negative = right side (when looking from p1 to p2)
+      const cross = (point[0] - p1[0]) * dy - (point[1] - p1[1]) * dx;
+      return cross;
     }
 
-    function pointSegDist(p, a, b) {
-      const vx = b[0] - a[0];
-      const vy = b[1] - a[1];
-      const wx = p[0] - a[0];
-      const wy = p[1] - a[1];
-      const c1 = vx * wx + vy * wy;
-      const c2 = vx * vx + vy * vy;
-      const t = c2 > EPS ? Math.max(0, Math.min(1, c1 / c2)) : 0;
-      const px = a[0] + t * vx;
-      const py = a[1] + t * vy;
-      const dx = p[0] - px;
-      const dy = p[1] - py;
-      return Math.hypot(dx, dy);
+    function isPointAfterLine(point, lineCoords) {
+      return calculateLineCross(point, lineCoords) > 0;
     }
 
-    function pointToPolygonDist(p, ring) {
-      if (!ring || ring.length < 2) return Infinity;
-      let minD = Infinity;
-      for (let i = 0; i < ring.length - 1; i++) {
-        const a = ring[i];
-        const b = ring[i + 1];
-        const d = pointSegDist(p, a, b);
-        if (d < minD) minD = d;
-      }
-      return minD;
+    function isPointBeforeLine(point, lineCoords) {
+      return calculateLineCross(point, lineCoords) < 0;
     }
 
-    function pointToPolygonsDist(p, polys) {
-      if (!polys || !polys.length) return Infinity;
-      let best = Infinity;
-      polys.forEach(poly => {
-        const d = pointToPolygonDist(p, poly);
-        if (d < best) best = d;
-      });
-      return best;
-    }
+    // Calculate distance from a point to a line segment
+    function distanceToSegment(point, segStart, segEnd) {
+      const [px, py] = point;
+      const [x1, y1] = segStart;
+      const [x2, y2] = segEnd;
 
-    function bestInteriorPoint(ring, avoidPolys) {
-      if (!ring || ring.length < 3) return null;
-      const bounds = ringBounds(ring);
-      const width = bounds.maxX - bounds.minX;
-      const height = bounds.maxY - bounds.minY;
-      const baseStep = Math.max(width, height) || 1;
-      let best = null;
-      let bestScore = -Infinity;
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const lengthSquared = dx * dx + dy * dy;
 
-      const consider = (pt) => {
-        if (!pointInPolygon(pt, ring)) return;
-        if (avoidPolys && pointInAnyPolygon(pt, avoidPolys)) return;
-        const distToRing = pointToPolygonDist(pt, ring);
-        const distToAvoid = pointToPolygonsDist(pt, avoidPolys);
-        const score = Math.min(distToRing, distToAvoid);
-        if (score > bestScore + 1e-6) {
-          bestScore = score;
-          best = pt;
-        }
-      };
-
-      consider(polygonCentroid(ring));
-
-      const iterations = 5;
-      for (let iter = 0; iter < iterations; iter++) {
-        const step = baseStep / Math.pow(2, iter + 1);
-        for (let x = bounds.minX; x <= bounds.maxX + EPS; x += step) {
-          for (let y = bounds.minY; y <= bounds.maxY + EPS; y += step) {
-            consider([x, y]);
-          }
-        }
-      }
-
-      if (best && (!avoidPolys || !pointInAnyPolygon(best, avoidPolys))) return best;
-      return null;
-    }
-
-    function clipPolygonToPolygon(subjectRing, clipRing) {
-      let output = ensureClosedRing(subjectRing);
-      const clip = ensureClosedRing(clipRing);
-      if (output.length < 3 || clip.length < 3) return [];
-
-      const clipArea = ringSignedArea(clip);
-      const clipCCW = clipArea > 0;
-
-      for (let i = 0; i < clip.length - 1; i++) {
-        const a = clip[i];
-        const b = clip[i + 1];
-        const keepPositive = (p) => {
-          const side = signedSide(p, a, b);
-          return clipCCW ? side >= -EPS : side <= EPS;
-        };
-
-        const input = output.slice();
-        output = [];
-        if (!input.length) break;
-
-        for (let j = 0; j < input.length - 1; j++) {
-          const current = input[j];
-          const next = input[j + 1];
-          const currentInside = keepPositive(current);
-          const nextInside = keepPositive(next);
-
-          if (currentInside && nextInside) {
-            output.push(next);
-          } else if (currentInside && !nextInside) {
-            const hit = intersectSegmentWithLine(current, next, a, b);
-            if (hit) output.push(hit);
-          } else if (!currentInside && nextInside) {
-            const hit = intersectSegmentWithLine(current, next, a, b);
-            if (hit) output.push(hit);
-            output.push(next);
-          }
-        }
-        if (output.length) {
-          const first = output[0];
-          const last = output[output.length - 1];
-          if (Math.abs(first[0] - last[0]) > EPS || Math.abs(first[1] - last[1]) > EPS) {
-            output.push([first[0], first[1]]);
-          }
-        }
+      if (lengthSquared === 0) {
+        // Segment is a point
+        return Math.hypot(px - x1, py - y1);
       }
 
-      return output;
+      // Calculate projection parameter
+      let t = ((px - x1) * dx + (py - y1) * dy) / lengthSquared;
+      t = Math.max(0, Math.min(1, t)); // Clamp to segment
+
+      // Calculate closest point on segment
+      const closestX = x1 + t * dx;
+      const closestY = y1 + t * dy;
+
+      return Math.hypot(px - closestX, py - closestY);
     }
 
-    function clipPolygonWithLine(ring, a, b, keepPositive = true) {
-      const closed = ensureClosedRing(ring);
-      if (closed.length < 3) return [];
-      const out = [];
-      for (let i = 0; i < closed.length - 1; i++) {
-        const p1 = closed[i];
-        const p2 = closed[i + 1];
-        const d1 = signedSide(p1, a, b);
-        const d2 = signedSide(p2, a, b);
-        const inside1 = keepPositive ? d1 >= -EPS : d1 <= EPS;
-        const inside2 = keepPositive ? d2 >= -EPS : d2 <= EPS;
-
-        if (inside1 && inside2) {
-          out.push(p2);
-        } else if (inside1 && !inside2) {
-          const hit = intersectSegmentWithLine(p1, p2, a, b);
-          if (hit) out.push(hit);
-        } else if (!inside1 && inside2) {
-          const hit = intersectSegmentWithLine(p1, p2, a, b);
-          if (hit) out.push(hit);
-          out.push(p2);
-        }
-      }
-
-      if (out.length) {
-        const first = out[0];
-        const last = out[out.length - 1];
-        if (Math.abs(first[0] - last[0]) > EPS || Math.abs(first[1] - last[1]) > EPS) {
-          out.push([first[0], first[1]]);
-        }
-      }
-      return out;
-    }
-
-    function clipPolygonToSideOfPolyline(ring, coords, samplePoint) {
-      if (!coords || coords.length < 2 || !samplePoint) return [];
-      let poly = ensureClosedRing(ring);
-      const safeSample = pushInsidePolygon(samplePoint, ring, polygonCentroid(ring));
-      for (let i = 0; i < coords.length - 1; i++) {
-        const a = coords[i];
-        const b = coords[i + 1];
-        const keepPositive = signedSide(safeSample, a, b) >= 0;
-        poly = clipPolygonWithLine(poly, a, b, keepPositive);
-        if (!poly.length) break;
-      }
-      return poly;
-    }
-
-    function dirToVector(dir) {
-      const d = (dir || '').toUpperCase();
-      const dx = (d.includes('E') ? 1 : 0) - (d.includes('W') ? 1 : 0);
-      const dy = (d.includes('N') ? 1 : 0) - (d.includes('S') ? 1 : 0);
-      const v = normalise([dx, dy]);
-      return (Math.abs(v[0]) < EPS && Math.abs(v[1]) < EPS) ? [1, 0] : v;
-    }
-
-    function midPointOfCoords(coords) {
-      if (!coords || !coords.length) return null;
-      const mid = coords[Math.floor(coords.length / 2)];
-      return mid ? [mid[0], mid[1]] : null;
-    }
-
-    function ringsIntersect(r1, r2) {
-      if (!r1 || !r2 || r1.length < 2 || r2.length < 2) return false;
-      const a = ensureClosedRing(r1);
-      const b = ensureClosedRing(r2);
-      for (let i = 0; i < a.length - 1; i++) {
-        const p1 = a[i], p2 = a[i + 1];
-        for (let j = 0; j < b.length - 1; j++) {
-          const q1 = b[j], q2 = b[j + 1];
-          const hit = segIntersect(p1, p2, q1, q2);
-          if (hit) return true;
-        }
-      }
-      return false;
-    }
-
-    function ringTouchesOrInside(outer, ring) {
-      const closedOuter = ensureClosedRing(outer);
-      const closedRing = ensureClosedRing(ring);
-      if (closedRing.some(pt => pointInPolygon(pt, closedOuter))) return true;
-      if (ringsIntersect(closedOuter, closedRing)) return true;
-      return false;
-    }
-
-    function bestInteriorPointWithPredicate(ring, avoidPolys, predicate) {
-      if (!predicate) return bestInteriorPoint(ring, avoidPolys);
-      if (!ring || ring.length < 3) return null;
-      const bounds = ringBounds(ring);
-      const width = bounds.maxX - bounds.minX;
-      const height = bounds.maxY - bounds.minY;
-      const baseStep = Math.max(width, height) || 1;
-      let best = null;
-      let bestScore = -Infinity;
-
-      const consider = (pt) => {
-        if (!pointInPolygon(pt, ring)) return;
-        if (avoidPolys && pointInAnyPolygon(pt, avoidPolys)) return;
-        if (!predicate(pt)) return;
-        const distToRing = pointToPolygonDist(pt, ring);
-        const distToAvoid = pointToPolygonsDist(pt, avoidPolys);
-        const score = Math.min(distToRing, distToAvoid);
-        if (score > bestScore + 1e-6) {
-          bestScore = score;
-          best = pt;
-        }
-      };
-
-      consider(polygonCentroid(ring));
-
-      const iterations = 5;
-      for (let iter = 0; iter < iterations; iter++) {
-        const step = baseStep / Math.pow(2, iter + 1);
-        for (let x = bounds.minX; x <= bounds.maxX + EPS; x += step) {
-          for (let y = bounds.minY; y <= bounds.maxY + EPS; y += step) {
-            consider([x, y]);
-          }
-        }
-      }
-
-      return best;
-    }
-
-    function computeRestPolygons(ring, occupiedPolys) {
-      const outer = sanitizeRing(ring);
-      const holes = [];
-      (occupiedPolys || []).forEach(poly => {
-        const clean = sanitizeRing(poly);
-        if (!clean.length) return;
-        const clipped = clipPolygonToPolygon(clean, outer);
-        const clippedClean = sanitizeRing(clipped);
-        if (!clippedClean.length) return;
-        const hole = orientRing(clippedClean, true);
-        if (ringTouchesOrInside(outer, hole)) holes.push(hole);
-      });
-
-      const orientedOuter = orientRing(outer, false);
-
-      const labelPoint = bestInteriorPointWithPredicate(
-        orientedOuter,
-        holes,
-        (p) => !pointInAnyPolygon(p, holes)
-      ) || polygonCentroid(orientedOuter);
-
-      const polyObj = { outer: orientedOuter, holes };
-      return { polys: [polyObj], labelPoint };
-    }
-
-    function findOpenPointInRing(ring, avoidPolys, fallback) {
-      const centroid = polygonCentroid(ring);
-      const base = fallback || centroid;
-      const bounds = ringBounds(ring);
-      const spanX = (bounds.maxX - bounds.minX) || 1;
-      const spanY = (bounds.maxY - bounds.minY) || 1;
-      const isFree = (pt) => pointInPolygon(pt, ring) && !pointInAnyPolygon(pt, avoidPolys || []);
-      if (isFree(base)) return base;
-      const radii = [0.1, 0.2, 0.35, 0.5, 0.75, 1.0, 1.3, 1.6];
-      for (const r of radii) {
-        for (let ang = 0; ang < 360; ang += 30) {
-          const rad = ang * Math.PI / 180;
-          const candidate = [
-            base[0] + Math.cos(rad) * r * spanX,
-            base[1] + Math.sin(rad) * r * spanY
-          ];
-          if (isFree(candidate)) return candidate;
-        }
-      }
-      return null;
-    }
-
-    function buildSidePoints(sideText) {
-      if (!sideText) return [];
-      const toks = tokenizeSplitSide(sideText);
-      const pts = [];
-      toks.forEach(tok => {
-        const resolved = resolveTokenToCoord(tok);
-        if (resolved) pts.push(resolved);
-        else console.warn('Split token unresolved', tok);
-      });
-      return pts;
-    }
-
-    function drawGreenLines() {
-      const lineFeatures = [];
+    function drawSplitLines() {
+      const solidLineFeatures = [];
+      const dashedLineFeatures = [];
       const pointFeatures = [];
-      const labelFeatures = [];
-      const zoneLabelFeatures = [];
-      const zoneFillFeatures = [];
-      const zonePolygons = [];
-
-      if (selectedZoneId !== null && map.getSource('qnh-zone-fills')) {
-        if (map.removeFeatureState) {
-          map.removeFeatureState({ source: 'qnh-zone-fills', id: selectedZoneId });
-        } else {
-          map.setFeatureState({ source: 'qnh-zone-fills', id: selectedZoneId }, { selected: false });
-        }
-        selectedZoneId = null;
-      }
-      zoneFeatureIdCounter = 1;
-
-      const ensureSource = (id, data) => {
-        if (map.getSource(id)) {
-          map.getSource(id).setData(data);
-        } else {
-          map.addSource(id, { type: 'geojson', data });
-        }
-      };
+      const splitLabelFeatures = [];
 
       const seenPoint = new Set();
       const addPoint = (area, p) => {
@@ -1102,174 +732,570 @@
         });
       };
 
-      const areaFeatureByCode = {};
-      (areaGeoJSON?.features || []).forEach(f => {
-        const code = f.properties?.area_code?.toUpperCase();
-        if (code) areaFeatureByCode[code] = f;
-      });
+      const buildLineCoords = (sideText) => {
+        const tokens = tokenizeSplitSide(sideText);
+        const coords = [];
+        tokens.forEach(tok => {
+          const resolved = resolveTokenToCoord(tok);
+          if (resolved) {
+            coords.push(resolved);
+          } else {
+            console.warn('Unresolved split token:', tok);
+          }
+        });
+        return coords;
+      };
+
+      const getAreaRing = (areaCode) => {
+        const feature = areaGeoJSON?.features?.find(f => 
+          f.properties?.area_code?.toUpperCase() === areaCode.toUpperCase()
+        );
+        return feature?.geometry?.coordinates?.[0] || null;
+      };
+
+      const pointInPolygon = (point, ring) => {
+        const [x, y] = point;
+        let inside = false;
+        for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+          const [xi, yi] = ring[i];
+          const [xj, yj] = ring[j];
+          const intersect = ((yi > y) !== (yj > y)) &&
+            (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
+          if (intersect) inside = !inside;
+        }
+        return inside;
+      };
+
+      const extendToBoundary = (point, direction, ring) => {
+        if (!ring || !point || !direction) return null;
+        
+        const far = [
+          point[0] + direction[0] * 1000,
+          point[1] + direction[1] * 1000
+        ];
+        
+        let closest = null;
+        let minDist = Infinity;
+        
+        for (let i = 0; i < ring.length - 1; i++) {
+          const a = ring[i];
+          const b = ring[i + 1];
+          const hit = lineIntersection(point, far, a, b);
+          if (hit) {
+            const dist = Math.hypot(hit[0] - point[0], hit[1] - point[1]);
+            if (dist > 0.0001 && dist < minDist) {
+              minDist = dist;
+              closest = hit;
+            }
+          }
+        }
+        
+        return closest;
+      };
+
+      const lineIntersection = (p1, p2, p3, p4) => {
+        const x1 = p1[0], y1 = p1[1];
+        const x2 = p2[0], y2 = p2[1];
+        const x3 = p3[0], y3 = p3[1];
+        const x4 = p4[0], y4 = p4[1];
+        
+        const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+        if (Math.abs(denom) < 1e-10) return null;
+        
+        const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
+        const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
+        
+        if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
+          return [x1 + t * (x2 - x1), y1 + t * (y2 - y1)];
+        }
+        
+        return null;
+      };
+
+      const clipPolyline = (coords, ring) => {
+        const solid = [];
+        const dashed = [];
+
+        for (let i = 0; i < coords.length - 1; i++) {
+          const p1 = coords[i];
+          const p2 = coords[i + 1];
+
+          const p1Inside = pointInPolygon(p1, ring);
+          const p2Inside = pointInPolygon(p2, ring);
+
+          if (p1Inside && p2Inside) {
+            solid.push([p1, p2]);
+          } else if (!p1Inside && !p2Inside) {
+            let crossings = [];
+            for (let j = 0; j < ring.length - 1; j++) {
+              const hit = lineIntersection(p1, p2, ring[j], ring[j + 1]);
+              if (hit) {
+                const dist = Math.hypot(hit[0] - p1[0], hit[1] - p1[1]);
+                crossings.push({ point: hit, dist });
+              }
+            }
+
+            if (crossings.length >= 2) {
+              crossings.sort((a, b) => a.dist - b.dist);
+              dashed.push([p1, crossings[0].point]);
+              solid.push([crossings[0].point, crossings[1].point]);
+              dashed.push([crossings[1].point, p2]);
+            } else {
+              dashed.push([p1, p2]);
+            }
+          } else {
+            let crossing = null;
+            for (let j = 0; j < ring.length - 1; j++) {
+              const hit = lineIntersection(p1, p2, ring[j], ring[j + 1]);
+              if (hit) {
+                crossing = hit;
+                break;
+              }
+            }
+
+            if (crossing) {
+              if (p1Inside) {
+                solid.push([p1, crossing]);
+                dashed.push([crossing, p2]);
+              } else {
+                dashed.push([p1, crossing]);
+                solid.push([crossing, p2]);
+              }
+            } else {
+              if (p1Inside || p2Inside) {
+                solid.push([p1, p2]);
+              } else {
+                dashed.push([p1, p2]);
+              }
+            }
+          }
+        }
+
+        return { solid, dashed };
+      };
+
+      const getCentroid = (ring) => {
+        if (!ring || ring.length < 3) return null;
+        let sumX = 0, sumY = 0;
+        const count = ring.length - 1; // Exclude closing point
+        for (let i = 0; i < count; i++) {
+          sumX += ring[i][0];
+          sumY += ring[i][1];
+        }
+        return [sumX / count, sumY / count];
+      };
 
       Object.entries(areaSplits || {}).forEach(([areaCode, rules]) => {
-        const areaFeature = areaFeatureByCode[areaCode.toUpperCase()];
-        const ringRaw = areaFeature?.geometry?.coordinates?.[0];
-        const ring = sanitizeRing(ringRaw);
-        if (!ring.length) return;
+        const ring = getAreaRing(areaCode);
+        if (!ring) return;
 
-        const splitLines = [];
+        // Calculate centroid of the main area for potential label placement
+        const areaCentroid = getCentroid(ring);
 
         (rules || []).forEach((rule, idx) => {
           if (rule.type === 'between') {
-            const lhsPts = buildSidePoints(rule.lhs);
-            const rhsPts = buildSidePoints(rule.rhs);
-            if (lhsPts.length >= 2) lhsPts.forEach(p => addPoint(areaCode, p));
-            if (rhsPts.length >= 2) rhsPts.forEach(p => addPoint(areaCode, p));
+            const lhsPts = buildLineCoords(rule.lhs);
+            const rhsPts = buildLineCoords(rule.rhs);
+            
+            lhsPts.forEach(p => addPoint(areaCode, p));
+            rhsPts.forEach(p => addPoint(areaCode, p));
+            
+            if (lhsPts.length >= 2 && ring) {
+              const coords = lhsPts.map(p => p.coord);
 
-            const lhsCoords = lhsPts.map(p => p.coord);
-            const rhsCoords = rhsPts.map(p => p.coord);
-            const lhsExt = extendPolylineToBorders(lhsCoords, ring);
-            const rhsExt = extendPolylineToBorders(rhsCoords, ring);
-            if (lhsExt.length < 2 || rhsExt.length < 2) return;
+              const firstDir = [
+                coords[0][0] - coords[1][0],
+                coords[0][1] - coords[1][1]
+              ];
+              const firstLen = Math.hypot(firstDir[0], firstDir[1]);
+              const firstNorm = firstLen > 0 ? [firstDir[0] / firstLen, firstDir[1] / firstLen] : [0, 0];
+              const startBoundary = extendToBoundary(coords[0], firstNorm, ring);
 
-            const lhsClippedSegs = clipPolylineToPolygon(lhsExt, ring);
-            const rhsClippedSegs = clipPolylineToPolygon(rhsExt, ring);
-            lhsClippedSegs.forEach((seg) => {
-              lineFeatures.push({
-                type: 'Feature',
-                properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'lhs', idx },
-                geometry: { type: 'LineString', coordinates: seg }
+              const lastIdx = coords.length - 1;
+              const lastDir = [
+                coords[lastIdx][0] - coords[lastIdx - 1][0],
+                coords[lastIdx][1] - coords[lastIdx - 1][1]
+              ];
+              const lastLen = Math.hypot(lastDir[0], lastDir[1]);
+              const lastNorm = lastLen > 0 ? [lastDir[0] / lastLen, lastDir[1] / lastLen] : [0, 0];
+              const endBoundary = extendToBoundary(coords[lastIdx], lastNorm, ring);
+
+              const extendedCoords = [
+                ...(startBoundary ? [startBoundary] : []),
+                ...coords,
+                ...(endBoundary ? [endBoundary] : [])
+              ];
+
+              const { solid, dashed } = clipPolyline(extendedCoords, ring);
+              
+              solid.forEach(seg => {
+                solidLineFeatures.push({
+                  type: 'Feature',
+                  properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'lhs', idx },
+                  geometry: { type: 'LineString', coordinates: seg }
+                });
               });
-              splitLines.push({ a: seg[0], b: seg[1] });
-            });
-            rhsClippedSegs.forEach((seg) => {
-              lineFeatures.push({
-                type: 'Feature',
-                properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'rhs', idx },
-                geometry: { type: 'LineString', coordinates: seg }
+              
+              dashed.forEach(seg => {
+                dashedLineFeatures.push({
+                  type: 'Feature',
+                  properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'lhs', idx },
+                  geometry: { type: 'LineString', coordinates: seg }
+                });
               });
-              splitLines.push({ a: seg[0], b: seg[1] });
-            });
+            }
+            
+            if (rhsPts.length >= 2 && ring) {
+              const coords = rhsPts.map(p => p.coord);
 
+              const firstDir = [
+                coords[0][0] - coords[1][0],
+                coords[0][1] - coords[1][1]
+              ];
+              const firstLen = Math.hypot(firstDir[0], firstDir[1]);
+              const firstNorm = firstLen > 0 ? [firstDir[0] / firstLen, firstDir[1] / firstLen] : [0, 0];
+              const startBoundary = extendToBoundary(coords[0], firstNorm, ring);
+
+              const lastIdx = coords.length - 1;
+              const lastDir = [
+                coords[lastIdx][0] - coords[lastIdx - 1][0],
+                coords[lastIdx][1] - coords[lastIdx - 1][1]
+              ];
+              const lastLen = Math.hypot(lastDir[0], lastDir[1]);
+              const lastNorm = lastLen > 0 ? [lastDir[0] / lastLen, lastDir[1] / lastLen] : [0, 0];
+              const endBoundary = extendToBoundary(coords[lastIdx], lastNorm, ring);
+
+              const extendedCoords = [
+                ...(startBoundary ? [startBoundary] : []),
+                ...coords,
+                ...(endBoundary ? [endBoundary] : [])
+              ];
+
+              const { solid, dashed } = clipPolyline(extendedCoords, ring);
+              
+              solid.forEach(seg => {
+                solidLineFeatures.push({
+                  type: 'Feature',
+                  properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'rhs', idx },
+                  geometry: { type: 'LineString', coordinates: seg }
+                });
+              });
+              
+              dashed.forEach(seg => {
+                dashedLineFeatures.push({
+                  type: 'Feature',
+                  properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'rhs', idx },
+                  geometry: { type: 'LineString', coordinates: seg }
+                });
+              });
+            }
           }
 
           if (rule.type === 'of') {
-            const pts = buildSidePoints(rule.lhs);
+            const pts = buildLineCoords(rule.lhs);
             pts.forEach(p => addPoint(areaCode, p));
-            const coords = pts.map(p => p.coord);
-            if (coords.length < 2) return;
 
-            const ext = extendPolylineToBorders(coords, ring);
-            const clippedSegs = clipPolylineToPolygon(ext, ring);
-            clippedSegs.forEach((seg) => {
-              lineFeatures.push({
-                type: 'Feature',
-                properties: { area: areaCode, qnh: rule.qnh, type: 'of', dir: rule.dir || '', idx },
-                geometry: { type: 'LineString', coordinates: seg }
+            if (pts.length >= 2 && ring) {
+              const coords = pts.map(p => p.coord);
+
+              const firstDir = [
+                coords[0][0] - coords[1][0],
+                coords[0][1] - coords[1][1]
+              ];
+              const firstLen = Math.hypot(firstDir[0], firstDir[1]);
+              const firstNorm = firstLen > 0 ? [firstDir[0] / firstLen, firstDir[1] / firstLen] : [0, 0];
+              const startBoundary = extendToBoundary(coords[0], firstNorm, ring);
+
+              const lastIdx = coords.length - 1;
+              const lastDir = [
+                coords[lastIdx][0] - coords[lastIdx - 1][0],
+                coords[lastIdx][1] - coords[lastIdx - 1][1]
+              ];
+              const lastLen = Math.hypot(lastDir[0], lastDir[1]);
+              const lastNorm = lastLen > 0 ? [lastDir[0] / lastLen, lastDir[1] / lastLen] : [0, 0];
+              const endBoundary = extendToBoundary(coords[lastIdx], lastNorm, ring);
+
+              const extendedCoords = [
+                ...(startBoundary ? [startBoundary] : []),
+                ...coords,
+                ...(endBoundary ? [endBoundary] : [])
+              ];
+
+              const { solid, dashed } = clipPolyline(extendedCoords, ring);
+              
+              solid.forEach(seg => {
+                solidLineFeatures.push({
+                  type: 'Feature',
+                  properties: { area: areaCode, qnh: rule.qnh, type: 'of', dir: rule.dir || '', idx },
+                  geometry: { type: 'LineString', coordinates: seg }
+                });
               });
-              splitLines.push({ a: seg[0], b: seg[1] });
-            });
-
+              
+              dashed.forEach(seg => {
+                dashedLineFeatures.push({
+                  type: 'Feature',
+                  properties: { area: areaCode, qnh: rule.qnh, type: 'of', dir: rule.dir || '', idx },
+                  geometry: { type: 'LineString', coordinates: seg }
+                });
+              });
+            }
           }
         });
 
+        // Create labels for split zones using proper zone centroid calculation
+        // First, collect all split lines for this area
+        const splitLines = [];
+        rules.forEach((rule, ruleIdx) => {
+          if (rule.type === 'between') {
+            const lhsPts = buildLineCoords(rule.lhs || '');
+            const rhsPts = buildLineCoords(rule.rhs || '');
+
+            if (lhsPts.length >= 2 && rhsPts.length >= 2) {
+              splitLines.push({
+                lhsCoords: lhsPts.map(p => p.coord),
+                rhsCoords: rhsPts.map(p => p.coord),
+                rule: rule,
+                ruleIdx: ruleIdx
+              });
+            }
+          } else if (rule.type === 'of') {
+            const pts = buildLineCoords(rule.lhs || '');
+            if (pts.length >= 2) {
+              splitLines.push({
+                coords: pts.map(p => p.coord),
+                rule: rule,
+                ruleIdx: ruleIdx
+              });
+            }
+          }
+        });
+
+        // Generate sample points within the area polygon
+        const samplePoints = generateSamplePoints(ring, 40);
+
+        // For each rule with a QNH, determine which zone it belongs to and calculate centroid
+        rules.forEach((rule, ruleIdx) => {
+          if (!rule.qnh) return;
+
+          let zonePoints = [];
+
+          if (rule.type === 'of' && rule.dir) {
+            // Find the split line for this rule
+            const splitLine = splitLines.find(sl => sl.ruleIdx === ruleIdx);
+            if (splitLine && splitLine.coords && splitLine.coords.length >= 2) {
+              // Filter points that are on the correct side of the line
+              zonePoints = samplePoints.filter(pt => {
+                return isPointOnDirectionSideOfLine(pt, splitLine.coords, rule.dir);
+              });
+
+            }
+          } else if (rule.type === 'between') {
+            // Find the BETWEEN rule with both lines
+            const splitLine = splitLines.find(sl => sl.ruleIdx === ruleIdx);
+
+            if (splitLine && splitLine.lhsCoords && splitLine.rhsCoords) {
+              // A point is "between" two lines if it's on the inside/facing side of both lines
+              // First, determine which sides of the lines face each other
+
+              // Get midpoints of both lines
+              const lhsMid = [
+                (splitLine.lhsCoords[0][0] + splitLine.lhsCoords[splitLine.lhsCoords.length - 1][0]) / 2,
+                (splitLine.lhsCoords[0][1] + splitLine.lhsCoords[splitLine.lhsCoords.length - 1][1]) / 2
+              ];
+              const rhsMid = [
+                (splitLine.rhsCoords[0][0] + splitLine.rhsCoords[splitLine.rhsCoords.length - 1][0]) / 2,
+                (splitLine.rhsCoords[0][1] + splitLine.rhsCoords[splitLine.rhsCoords.length - 1][1]) / 2
+              ];
+
+              // Calculate which side of each line the other line is on
+              const lhsCrossToRhs = calculateLineCross(rhsMid, splitLine.lhsCoords);
+              const rhsCrossToLhs = calculateLineCross(lhsMid, splitLine.rhsCoords);
+
+              // Now filter points that are on the same side as the facing sides
+              zonePoints = samplePoints.filter(pt => {
+                const lhsCross = calculateLineCross(pt, splitLine.lhsCoords);
+                const rhsCross = calculateLineCross(pt, splitLine.rhsCoords);
+
+                // Point is between if it's on the same side of LHS as RHS is,
+                // AND on the same side of RHS as LHS is
+                const sameSideAsRhs = (lhsCross > 0) === (lhsCrossToRhs > 0);
+                const sameSideAsLhs = (rhsCross > 0) === (rhsCrossToLhs > 0);
+
+                return sameSideAsRhs && sameSideAsLhs;
+              });
+
+            }
+          } else if (rule.type === 'rest') {
+            // REST zone contains points not in any other zone
+            zonePoints = samplePoints.filter(pt => {
+              // Check if point is NOT in any specifically defined zone
+              for (let i = 0; i < rules.length; i++) {
+                if (i === ruleIdx) continue; // Skip the REST rule itself
+
+                const otherRule = rules[i];
+                const otherLine = splitLines.find(sl => sl.ruleIdx === i);
+
+                if (otherRule.type === 'of' && otherRule.dir && otherLine && otherLine.coords) {
+                  if (isPointOnDirectionSideOfLine(pt, otherLine.coords, otherRule.dir)) {
+                    return false; // Point is in another zone
+                  }
+                } else if (otherRule.type === 'between' && otherLine && otherLine.lhsCoords && otherLine.rhsCoords) {
+                  // Use the same improved logic as BETWEEN zone detection
+                  const lhsMid = [
+                    (otherLine.lhsCoords[0][0] + otherLine.lhsCoords[otherLine.lhsCoords.length - 1][0]) / 2,
+                    (otherLine.lhsCoords[0][1] + otherLine.lhsCoords[otherLine.lhsCoords.length - 1][1]) / 2
+                  ];
+                  const rhsMid = [
+                    (otherLine.rhsCoords[0][0] + otherLine.rhsCoords[otherLine.rhsCoords.length - 1][0]) / 2,
+                    (otherLine.rhsCoords[0][1] + otherLine.rhsCoords[otherLine.rhsCoords.length - 1][1]) / 2
+                  ];
+
+                  const lhsCrossToRhs = calculateLineCross(rhsMid, otherLine.lhsCoords);
+                  const rhsCrossToLhs = calculateLineCross(lhsMid, otherLine.rhsCoords);
+
+                  const lhsCross = calculateLineCross(pt, otherLine.lhsCoords);
+                  const rhsCross = calculateLineCross(pt, otherLine.rhsCoords);
+
+                  const sameSideAsRhs = (lhsCross > 0) === (lhsCrossToRhs > 0);
+                  const sameSideAsLhs = (rhsCross > 0) === (rhsCrossToLhs > 0);
+
+                  if (sameSideAsRhs && sameSideAsLhs) {
+                    return false; // Point is in the between zone
+                  }
+                }
+              }
+              return true; // Point is not in any other zone
+            });
+          }
+
+          // Calculate centroid of zone points
+          if (zonePoints.length > 0) {
+            // Find the point that's furthest from ALL boundaries (red area boundary + green split lines)
+            let bestPoint = zonePoints[0];
+            let maxMinDist = 0;
+
+            // Sample points to find the best interior point
+            const sampleStep = Math.max(1, Math.floor(zonePoints.length / 50));
+
+            for (let i = 0; i < zonePoints.length; i += sampleStep) {
+              const pt = zonePoints[i];
+              let minDistToBoundary = Infinity;
+
+              // Check distance to red area boundary
+              for (let j = 0; j < ring.length - 1; j++) {
+                const dist = distanceToSegment(pt, ring[j], ring[j + 1]);
+                minDistToBoundary = Math.min(minDistToBoundary, dist);
+              }
+
+              // Check distance to relevant green split lines
+              if (rule.type === 'of' && rule.dir) {
+                const splitLine = splitLines.find(sl => sl.ruleIdx === ruleIdx);
+                if (splitLine && splitLine.coords) {
+                  for (let j = 0; j < splitLine.coords.length - 1; j++) {
+                    const dist = distanceToSegment(pt, splitLine.coords[j], splitLine.coords[j + 1]);
+                    minDistToBoundary = Math.min(minDistToBoundary, dist);
+                  }
+                }
+              } else if (rule.type === 'between') {
+                const splitLine = splitLines.find(sl => sl.ruleIdx === ruleIdx);
+                if (splitLine && splitLine.lhsCoords && splitLine.rhsCoords) {
+                  for (let j = 0; j < splitLine.lhsCoords.length - 1; j++) {
+                    const dist = distanceToSegment(pt, splitLine.lhsCoords[j], splitLine.lhsCoords[j + 1]);
+                    minDistToBoundary = Math.min(minDistToBoundary, dist);
+                  }
+                  for (let j = 0; j < splitLine.rhsCoords.length - 1; j++) {
+                    const dist = distanceToSegment(pt, splitLine.rhsCoords[j], splitLine.rhsCoords[j + 1]);
+                    minDistToBoundary = Math.min(minDistToBoundary, dist);
+                  }
+                }
+              } else if (rule.type === 'rest') {
+                // For REST zones, check distance to ALL split lines in this area
+                splitLines.forEach(sl => {
+                  if (sl.coords) {
+                    for (let j = 0; j < sl.coords.length - 1; j++) {
+                      const dist = distanceToSegment(pt, sl.coords[j], sl.coords[j + 1]);
+                      minDistToBoundary = Math.min(minDistToBoundary, dist);
+                    }
+                  }
+                  if (sl.lhsCoords) {
+                    for (let j = 0; j < sl.lhsCoords.length - 1; j++) {
+                      const dist = distanceToSegment(pt, sl.lhsCoords[j], sl.lhsCoords[j + 1]);
+                      minDistToBoundary = Math.min(minDistToBoundary, dist);
+                    }
+                  }
+                  if (sl.rhsCoords) {
+                    for (let j = 0; j < sl.rhsCoords.length - 1; j++) {
+                      const dist = distanceToSegment(pt, sl.rhsCoords[j], sl.rhsCoords[j + 1]);
+                      minDistToBoundary = Math.min(minDistToBoundary, dist);
+                    }
+                  }
+                });
+              }
+
+              // Keep track of the point with maximum distance to nearest boundary
+              if (minDistToBoundary > maxMinDist) {
+                maxMinDist = minDistToBoundary;
+                bestPoint = pt;
+              }
+            }
+
+            // Use best point if found, otherwise fall back to centroid
+            const finalPoint = maxMinDist > 0 ? bestPoint : calculateCentroidOfPoints(zonePoints);
+
+
+            splitLabelFeatures.push({
+              type: 'Feature',
+              properties: {
+                area: areaCode,
+                qnh: rule.qnh,
+                ruleType: rule.type,
+                ruleIndex: ruleIdx,
+                direction: rule.dir || ''
+              },
+              geometry: {
+                type: 'Point',
+                coordinates: finalPoint
+              }
+            });
+          } else if (areaCentroid) {
+            // Fallback to simple offset if no sample points found
+            let labelCoord = [...areaCentroid];
+            const offsetX = (ruleIdx - (rules.length - 1) / 2) * 1.2;
+            const offsetY = (ruleIdx - (rules.length - 1) / 2) * 0.8;
+            labelCoord = [areaCentroid[0] + offsetX, areaCentroid[1] + offsetY];
+
+            splitLabelFeatures.push({
+              type: 'Feature',
+              properties: {
+                area: areaCode,
+                qnh: rule.qnh,
+                ruleType: rule.type,
+                ruleIndex: ruleIdx,
+                direction: rule.dir || ''
+              },
+              geometry: {
+                type: 'Point',
+                coordinates: labelCoord
+              }
+            });
+          }
+        });
       });
 
-      const lineFC = { type: 'FeatureCollection', features: lineFeatures };
+      const solidLineFC = { type: 'FeatureCollection', features: solidLineFeatures };
+      const dashedLineFC = { type: 'FeatureCollection', features: dashedLineFeatures };
       const pointFC = { type: 'FeatureCollection', features: pointFeatures };
-      const labelFC = { type: 'FeatureCollection', features: labelFeatures };
-      const zoneLabelFC = { type: 'FeatureCollection', features: [] };
-      const zoneFillFC = { type: 'FeatureCollection', features: [] };
+      const splitLabelFC = { type: 'FeatureCollection', features: splitLabelFeatures };
 
-      ensureSource('qnh-split-lines', lineFC);
-      ensureSource('qnh-split-points', pointFC);
-      ensureSource('qnh-split-labels', labelFC);
-      ensureSource('qnh-zone-labels', zoneLabelFC);
-      ensureSource('qnh-zone-fills', zoneFillFC);
-
-      if (!map.getLayer('qnh-split-lines')) {
+      // Update or create split QNH labels
+      if (map.getSource('qnh-split-labels')) {
+        map.getSource('qnh-split-labels').setData(splitLabelFC);
+      } else {
+        map.addSource('qnh-split-labels', { type: 'geojson', data: splitLabelFC });
         map.addLayer({
-          id: 'qnh-split-lines',
-          type: 'line',
-          source: 'qnh-split-lines',
-          paint: {
-            'line-color': '#1f9e45',
-            'line-width': 3
-          }
-        });
-      }
-
-      if (!map.getLayer('qnh-split-points')) {
-        map.addLayer({
-          id: 'qnh-split-points',
+          id: 'qnh-split-labels',
           type: 'symbol',
-          source: 'qnh-split-points',
-          layout: {
-            'text-field': 'x',
-            'text-size': 18,
-            'text-allow-overlap': true,
-            'symbol-z-order': 'source'
-          },
-          paint: {
-            'text-color': '#000000',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1
-          }
-        });
-      }
-
-      if (!map.getLayer('qnh-split-point-labels')) {
-        map.addLayer({
-          id: 'qnh-split-point-labels',
-          type: 'symbol',
-          source: 'qnh-split-points',
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-size': 7,
-            'text-allow-overlap': true,
-            'symbol-z-order': 'source',
-            'text-offset': [0.8, 0],
-            'text-anchor': 'left'
-          },
-          paint: {
-            'text-color': '#111111',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1
-          }
-        });
-      }
-
-      if (!map.getLayer('qnh-zone-fills')) {
-        map.addLayer({
-          id: 'qnh-zone-fills',
-          type: 'fill',
-          source: 'qnh-zone-fills',
-          paint: {
-            'fill-color': [
-              'case',
-              ['==', ['get', 'kind'], 'rest'], '#ff4d4d', // REST in red
-              '#00a2ff' // others in blue
-            ],
-            'fill-opacity': 0.25
-          }
-        });
-      }
-
-      if (!map.getLayer('qnh-zone-fills-outline')) {
-        map.addLayer({
-          id: 'qnh-zone-fills-outline',
-          type: 'line',
-          source: 'qnh-zone-fills',
-          paint: {
-            'line-color': '#0044ff',
-            'line-width': 3,
-            'line-opacity': 0.9
-          }
-        });
-      }
-
-      if (!map.getLayer('qnh-zone-labels')) {
-        map.addLayer({
-          id: 'qnh-zone-labels',
-          type: 'symbol',
-          source: 'qnh-zone-labels',
+          source: 'qnh-split-labels',
           layout: {
             'text-field': ['to-string', ['get', 'qnh']],
             'text-font': ['Noto Sans Regular'],
@@ -1279,95 +1305,84 @@
             'symbol-z-order': 'source'
           },
           paint: {
-            'text-color': '#0a7e2f',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 2
+            'text-color': '#1f9e45',
+            'text-halo-color': '#fff',
+            'text-halo-width': 1.2
           }
         });
       }
 
-      if (!zoneClickBound) {
-        zoneClickBound = true;
-        map.on('click', 'qnh-zone-fills', (e) => {
-          const features = map.queryRenderedFeatures(e.point, { layers: ['qnh-zone-fills'] });
-          if (!features.length) return;
-          const f = features[0];
-          const fid = f.id;
-          if (selectedZoneId !== null) {
-            map.setFeatureState({ source: 'qnh-zone-fills', id: selectedZoneId }, { selected: false });
-          }
-          selectedZoneId = fid;
-          map.setFeatureState({ source: 'qnh-zone-fills', id: fid }, { selected: true });
-          const props = f.properties || {};
-          const name = props.name || `Zone ${fid}`;
-          const area = props.area || 'Unknown';
-          const qnh = props.qnh || '';
-          new maplibregl.Popup({ closeButton: true })
-            .setLngLat(e.lngLat)
-            .setHTML(`<strong>${name}</strong><br>Area: ${area}<br>QNH: ${qnh}`)
-            .addTo(map);
-        });
-      }
-
-      // persist for diagnostics
-      lastZonePolygons = zonePolygons.slice();
-      lastZoneLabelCandidates = zoneLabelFeatures.slice();
-      lastZoneLabelFeatures = zoneLabelFeatures.slice();
-
-    }
-
-    // Diagnostic: log or highlight any computed zone polygons missing an assigned QNH
-    function dumpMissingQnhs() {
-      if (!lastZonePolygons || !lastZonePolygons.length) {
-        console.info('No zone polygons available yet. Run a QNH fetch to compute split zones.');
-        return;
-      }
-
-      const missing = [];
-      const unlabeled = [];
-
-      const labelPts = (lastZoneLabelFeatures || []).map(f => ({ area: (f.properties && f.properties.area || '').toUpperCase(), qnh: f.properties && f.properties.qnh, coord: f.geometry && f.geometry.coordinates }));
-
-      lastZonePolygons.forEach((pz, idx) => {
-        const area = (pz.area || '').toUpperCase();
-        const assigned = pz.qnh;
-        const poly = pz.poly || pz.polygon || (pz.polygon && pz.polygon.geometry && pz.polygon.geometry.coordinates && pz.polygon.geometry.coordinates[0]);
-        if (!assigned) missing.push({ idx, area, polygon: pz });
-
-        const hasLabel = labelPts.some(lp => lp.area === area && lp.qnh === assigned && (() => {
-          try { return turf.booleanPointInPolygon(turf.point(lp.coord), turf.polygon([pz.poly || pz.polygon])); } catch (e) { return false; }
-        })());
-        if (!hasLabel) unlabeled.push({ idx, area, qnh: assigned });
-      });
-
-      console.group('Dump Missing QNHs');
-      console.log('Total pieces:', lastZonePolygons.length);
-      console.log('Pieces with no assigned QNH:', missing.length, missing.map(m => `${m.area}#${m.idx}`));
-      console.log('Pieces with assigned QNH but no placed label:', unlabeled.length, unlabeled.map(u => `${u.area}#${u.idx} (${u.qnh || '—'})`));
-
-      if (missing.length) console.log('Missing pieces detail:', missing);
-      if (unlabeled.length) console.log('Unlabeled pieces detail:', unlabeled);
-
-      const missingFeatures = missing.map(m => ({ type: 'Feature', properties: { area: m.area }, geometry: m.polygon && m.polygon.geometry ? m.polygon.geometry : null }));
-      if (map.getSource('qnh-missing-polygons')) {
-        map.getSource('qnh-missing-polygons').setData({ type: 'FeatureCollection', features: missingFeatures });
+      if (map.getSource('qnh-split-lines')) {
+        map.getSource('qnh-split-lines').setData(solidLineFC);
       } else {
-        map.addSource('qnh-missing-polygons', { type: 'geojson', data: { type: 'FeatureCollection', features: missingFeatures } });
-        map.addLayer({ id: 'qnh-missing-polygons-fill', type: 'fill', source: 'qnh-missing-polygons', paint: { 'fill-color': '#ffdddd', 'fill-opacity': 0.6, 'fill-outline-color': '#ff3333' } });
+        map.addSource('qnh-split-lines', { type: 'geojson', data: solidLineFC });
+        map.addLayer({
+          id: 'qnh-split-lines',
+          type: 'line',
+          source: 'qnh-split-lines',
+          paint: {
+            'line-color': '#1f9e45',
+            'line-width': 1.5
+          }
+        });
       }
 
-      console.groupEnd();
-      return { missing, unlabeled };
-    }
+      if (map.getSource('qnh-split-lines-dashed')) {
+        map.getSource('qnh-split-lines-dashed').setData(dashedLineFC);
+      } else {
+        map.addSource('qnh-split-lines-dashed', { type: 'geojson', data: dashedLineFC });
+        map.addLayer({
+          id: 'qnh-split-lines-dashed',
+          type: 'line',
+          source: 'qnh-split-lines-dashed',
+          paint: {
+            'line-color': '#1f9e45',
+            'line-width': 1.5,
+            'line-dasharray': [3, 3]
+          }
+        });
+      }
 
-    // Helper used above (small utility) - offset sample point from centroid in given dir
-    function offsetFromCentroid(ring, dirVec, distance) {
-      const c = polygonCentroid(ring);
-      return [c[0] + dirVec[0] * distance, c[1] + dirVec[1] * distance];
-    }
+      if (map.getSource('qnh-split-points')) {
+        map.getSource('qnh-split-points').setData(pointFC);
+      } else {
+        map.addSource('qnh-split-points', { type: 'geojson', data: pointFC });
+        map.addLayer({
+          id: 'qnh-split-points',
+          type: 'symbol',
+          source: 'qnh-split-points',
+          layout: {
+            'text-field': '×',
+            'text-size': 16,
+            'text-allow-overlap': true,
+            'symbol-z-order': 'source'
+          },
+          paint: {
+            'text-color': '#000000',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1.5
+          }
+        });
+        map.addLayer({
+          id: 'qnh-split-point-labels',
+          type: 'symbol',
+          source: 'qnh-split-points',
+          layout: {
+            'text-field': ['get', 'name'],
+            'text-size': 9,
+            'text-offset': [0, 1.2],
+            'text-anchor': 'top'
+          },
+          paint: {
+            'text-color': '#111111',
+            'text-halo-color': '#ffffff',
+            'text-halo-width': 1.5
+          }
+        });
+      }
 
-    // expose dump helper to console for quick debugging
-    window.dumpMissingQnhs = dumpMissingQnhs;
+      console.log(`Drew ${solidLineFeatures.length} solid lines, ${dashedLineFeatures.length} dashed lines, ${splitLabelFeatures.length} split labels, and ${pointFeatures.length} reference points`);
+    }
 
   </script>
 </body>
