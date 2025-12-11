@@ -775,8 +775,6 @@
       lineCenterX /= lineCoords.length;
       lineCenterY /= lineCoords.length;
 
-      // Use a hybrid approach: geographic direction relative to line center
-      // plus cross product for more accurate boundary detection
       const pointX = point[0];
       const pointY = point[1];
 
@@ -1231,6 +1229,13 @@
               });
 
               console.log(`${areaCode} rule ${ruleIdx} (${rule.dir} OF): Found ${zonePoints.length} points in zone (QNH ${rule.qnh})`);
+
+              // Extra debugging for Area 60
+              if (areaCode === 'AREA-60') {
+                console.log(`  AREA-60 Debug: Split line coords:`, splitLine.coords);
+                console.log(`  AREA-60 Debug: Direction: ${rule.dir}`);
+                console.log(`  AREA-60 Debug: Sample of zone points (first 5):`, zonePoints.slice(0, 5));
+              }
             }
           } else if (rule.type === 'between') {
             // Find the BETWEEN rule with both lines
@@ -1271,7 +1276,7 @@
             }
           } else if (rule.type === 'rest') {
             // REST zone contains points not in any other zone
-            zonePoints = samplePoints.filter(pt => {
+            let restCandidates = samplePoints.filter(pt => {
               // Check if point is NOT in any specifically defined zone
               for (let i = 0; i < rules.length; i++) {
                 if (i === ruleIdx) continue; // Skip the REST rule itself
@@ -1311,7 +1316,45 @@
               return true; // Point is not in any other zone
             });
 
+            // For REST zones paired with directional splits (N/S/E/W/NE/NW/SE/SW OF),
+            // prefer points in the OPPOSITE direction to avoid placing labels in the wrong lobe
+            let oppositeDirectionPoints = null;
+            for (let i = 0; i < rules.length; i++) {
+              if (i === ruleIdx) continue;
+              const otherRule = rules[i];
+              if (otherRule.type === 'of' && otherRule.dir) {
+                const otherLine = splitLines.find(sl => sl.ruleIdx === i);
+                if (otherLine && otherLine.coords) {
+                  // Get opposite direction
+                  const oppositeDir = {
+                    'N': 'S', 'S': 'N', 'E': 'W', 'W': 'E',
+                    'NE': 'SW', 'SW': 'NE', 'NW': 'SE', 'SE': 'NW'
+                  }[otherRule.dir.toUpperCase()];
+
+                  if (oppositeDir) {
+                    oppositeDirectionPoints = restCandidates.filter(pt =>
+                      isPointOnDirectionSideOfLine(pt, otherLine.coords, oppositeDir)
+                    );
+                    console.log(`${areaCode} REST: Found ${oppositeDirectionPoints.length} points in opposite direction (${oppositeDir}) of ${otherRule.dir} split`);
+                    break;
+                  }
+                }
+              }
+            }
+
+            // Use opposite direction points if we found enough, otherwise use all REST candidates
+            zonePoints = (oppositeDirectionPoints && oppositeDirectionPoints.length > 20)
+              ? oppositeDirectionPoints
+              : restCandidates;
+
             console.log(`${areaCode} rule ${ruleIdx} (REST): Found ${zonePoints.length} points in zone (QNH ${rule.qnh})`);
+
+            // Extra debugging for Area 60 REST zone
+            if (areaCode === 'AREA-60') {
+              console.log(`  AREA-60 Debug REST: Total sample points: ${samplePoints.length}`);
+              console.log(`  AREA-60 Debug REST: Points in REST zone: ${zonePoints.length}`);
+              console.log(`  AREA-60 Debug REST: Sample of REST zone points (first 10):`, zonePoints.slice(0, 10));
+            }
           }
 
           // Calculate centroid of zone points
@@ -1401,6 +1444,14 @@
             const finalPoint = maxMinDist > 0 ? bestPoint : zonePoints[Math.floor(zonePoints.length / 2)];
 
             console.log(`${areaCode} rule ${ruleIdx}: Placing QNH ${rule.qnh} label at [${finalPoint[0].toFixed(2)}, ${finalPoint[1].toFixed(2)}] (maxMinDist: ${maxMinDist.toFixed(4)})`);
+
+            // Extra validation for Area 60
+            if (areaCode === 'AREA-60') {
+              const isInsidePolygon = pointInPolygonHelper(finalPoint, ring);
+              console.log(`  AREA-60 Debug: Label at [${finalPoint[0].toFixed(4)}, ${finalPoint[1].toFixed(4)}] for QNH ${rule.qnh}`);
+              console.log(`  AREA-60 Debug: Label is inside polygon: ${isInsidePolygon}`);
+              console.log(`  AREA-60 Debug: Rule type: ${rule.type}, Direction: ${rule.dir || 'N/A'}`);
+            }
 
             splitLabelFeatures.push({
               type: 'Feature',
