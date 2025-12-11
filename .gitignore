@@ -1,0 +1,12 @@
+# Cloudflare Worker files
+r2-upload-worker.js
+wrangler.toml
+
+# Documentation
+R2-SETUP.md
+
+# Node modules (if any)
+node_modules/
+
+# Cloudflare
+.wrangler/

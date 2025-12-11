@@ -111,6 +111,62 @@
       font-weight: bold;
       font-size: 14px;
     }
+    .export-controls {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      font-size: 0.85rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 1;
+      display: none;
+    }
+    .export-controls.visible {
+      display: block;
+    }
+    .export-controls h4 {
+      margin: 0 0 8px 0;
+      font-size: 0.9rem;
+      font-weight: 600;
+    }
+    .export-btn {
+      display: block;
+      width: 100%;
+      padding: 6px 12px;
+      margin: 4px 0;
+      background: #1f9e45;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.85rem;
+      transition: background 0.2s;
+    }
+    .export-btn:hover {
+      background: #17803a;
+    }
+    .export-btn:active {
+      background: #136030;
+    }
+    .toggle-export-btn {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 8px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--stroke);
+      cursor: pointer;
+      font-size: 0.85rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      z-index: 2;
+    }
+    .toggle-export-btn:hover {
+      background: rgba(255, 255, 255, 1);
+    }
   </style>
 </head>
 <body>
@@ -126,6 +182,16 @@
     <div id="warning" role="status" aria-live="polite"></div>
     <div id="success" role="status" aria-live="polite"></div>
     <div id="map" aria-label="Area QNH map">
+      <button class="toggle-export-btn" onclick="toggleExportPanel()">Export Images</button>
+      <div class="export-controls" id="exportControls">
+        <h4>Export Regional Maps</h4>
+        <button class="export-btn" onclick="exportRegion('AU')">Australia (Full)</button>
+        <button class="export-btn" onclick="exportRegion('NE')">Northeast</button>
+        <button class="export-btn" onclick="exportRegion('SE')">Southeast</button>
+        <button class="export-btn" onclick="exportRegion('NW')">Northwest</button>
+        <button class="export-btn" onclick="exportRegion('SW')">Southwest</button>
+        <button class="export-btn" onclick="exportRegion('CURRENT')">Current View</button>
+      </div>
       <div class="legend">
         <h4>Legend</h4>
         <div class="legend-item">
@@ -167,8 +233,33 @@
 
     const QNH_WORKER_URL = 'https://areaqnh.therealleviticus.workers.dev/';
     const NAV_INDEX_URL = 'https://airspace.therealleviticus.workers.dev/';
+    const UPLOAD_WORKER_URL = 'https://imageupload.therealleviticus.workers.dev/'; // R2 upload endpoint
 
     const AREA_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"area_code":"AREA-20","name":"QNH_AREA_20","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[148.383333,-32.75],[150.0,-29.0],[154.703056,-28.043611],[155.0,-28.833333],[152.666667,-34.333333],[151.177222,-33.946111],[150.988333,-33.924444],[149.651944,-33.409444],[148.383333,-32.75]]]}},{"type":"Feature","properties":{"area_code":"AREA-21","name":"QNH_AREA_21","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[146.924722,-36.195278],[148.383333,-32.75],[149.651944,-33.409444],[150.988333,-33.924444],[151.177222,-33.946111],[152.666667,-34.333333],[150.870556,-37.881111],[149.976111,-37.503889],[146.924722,-36.195278]]]}},{"type":"Feature","properties":{"area_code":"AREA-22","name":"QNH_AREA_22","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-29.0],[150.0,-29.0],[148.383333,-32.75],[146.924722,-36.195278],[141.0,-33.65],[141.0,-29.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-24","name":"QNH_AREA_24","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[152.666667,-34.333333],[155.0,-28.833333],[163.0,-28.5],[163.0,-31.333333],[152.666667,-34.333333]]]}},{"type":"Feature","properties":{"area_code":"AREA-30","name":"QNH_AREA_30","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-33.65],[146.924722,-36.195278],[149.976111,-37.503889],[150.870556,-37.881111],[150.2,-39.57],[142.8575,-39.57],[141.0,-39.57],[141.0,-33.65]]]}},{"type":"Feature","properties":{"area_code":"AREA-40","name":"QNH_AREA_40","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[147.820833,-23.156111],[152.864444,-23.155833],[154.703056,-28.043611],[150.0,-29.0],[148.183333,-23.566667],[147.820833,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-41","name":"QNH_AREA_41","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[138.0,-26.0],[138.0,-23.156111],[147.820833,-23.156111],[148.183333,-23.566667],[150.0,-29.0],[141.0,-29.0],[141.0,-26.0],[138.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-43","name":"QNH_AREA_43","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[138.0,-23.156111],[138.0,-19.0],[143.533333,-18.3],[147.820833,-23.156111],[138.0,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-44","name":"QNH_AREA_44","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[143.533333,-18.3],[148.0,-18.283333],[152.864444,-23.155833],[147.820833,-23.156111],[143.533333,-18.3]]]}},{"type":"Feature","properties":{"area_code":"AREA-45","name":"QNH_AREA_45","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-9.833333],[141.033333,-9.616667],[142.083333,-9.261667],[142.805,-9.323889],[143.875,-9.133333],[144.233333,-9.4],[144.089167,-9.942778],[144.026667,-11.5],[144.072222,-11.725],[144.0,-12.0],[147.607778,-16.995833],[148.0,-18.283333],[143.533333,-18.3],[138.0,-19.0],[138.0,-14.0],[141.0,-9.833333]]]}},{"type":"Feature","properties":{"area_code":"AREA-50","name":"QNH_AREA_50","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[134.5,-35.5],[135.372222,-34.686667],[137.716667,-32.5],[141.0,-33.65],[141.0,-39.57],[134.5,-35.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-51","name":"QNH_AREA_51","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[135.0,-30.0],[141.0,-29.0],[141.0,-33.65],[137.716667,-32.5],[135.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-52","name":"QNH_AREA_52","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-26.0],[138.0,-26.0],[141.0,-26.0],[141.0,-29.0],[135.0,-30.0],[129.0,-30.0],[129.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-53","name":"QNH_AREA_53","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-30.0],[135.0,-30.0],[137.716667,-32.5],[135.372222,-34.686667],[134.5,-35.5],[131.0,-32.5],[129.0,-33.0],[129.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-60","name":"QNH_AREA_60","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.5,-27.5],[118.0,-27.5],[119.0,-32.25],[113.5,-33.5],[112.5,-27.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-61","name":"QNH_AREA_61","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[119.0,-32.25],[118.0,-27.5],[123.5,-27.5],[123.618333,-30.84],[119.0,-32.25]]]}},{"type":"Feature","properties":{"area_code":"AREA-62","name":"QNH_AREA_62","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.618333,-30.84],[129.0,-30.0],[129.0,-33.0],[123.5,-35.0],[123.618333,-30.84]]]}},{"type":"Feature","properties":{"area_code":"AREA-63","name":"QNH_AREA_63","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[113.5,-33.5],[119.0,-32.25],[123.618333,-30.84],[123.5,-35.0],[116.0,-36.25],[113.5,-33.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-64","name":"QNH_AREA_64","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.5,-23.88],[129.0,-23.88],[129.0,-30.0],[123.618333,-30.84],[123.5,-27.5],[123.5,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-65","name":"QNH_AREA_65","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.096944,-23.88],[115.984722,-23.88],[118.0,-27.5],[112.5,-27.5],[112.096944,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-66","name":"QNH_AREA_66","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[115.984722,-23.88],[123.5,-23.88],[123.5,-27.5],[118.0,-27.5],[115.984722,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-68","name":"QNH_AREA_68","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.0,-23.0],[113.0,-21.0],[117.0,-18.0],[120.0,-18.0],[123.5,-20.5],[123.5,-23.88],[115.984722,-23.88],[112.096944,-23.88],[112.0,-23.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-69","name":"QNH_AREA_69","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[117.0,-18.0],[124.0,-14.0],[126.148056,-13.751667],[127.5,-14.0],[128.416667,-14.833333],[129.0,-14.879444],[129.0,-20.0],[123.5,-20.5],[120.0,-18.0],[117.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-70","name":"QNH_AREA_70","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[142.8575,-39.57],[150.2,-39.57],[149.0,-43.0],[147.5,-44.5],[145.0,-44.0],[142.8575,-39.57]]]}},{"type":"Feature","properties":{"area_code":"AREA-80","name":"QNH_AREA_80","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-9.409722],[141.0,-9.833333],[138.0,-14.0],[138.0,-19.0],[129.0,-15.884444],[129.0,-14.879444],[129.0,-9.409722]]]}},{"type":"Feature","properties":{"area_code":"AREA-83","name":"QNH_AREA_83","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.5,-20.5],[129.0,-20.0],[129.0,-23.88],[123.5,-23.88],[123.5,-20.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-84","name":"QNH_AREA_84","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-20.0],[129.0,-15.884444],[138.0,-19.0],[138.0,-23.156111],[129.0,-22.25],[129.0,-20.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-85","name":"QNH_AREA_85","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-23.88],[129.0,-22.25],[138.0,-23.156111],[138.0,-26.0],[129.0,-26.0],[129.0,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-86","name":"QNH_AREA_86","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[124.774444,-10.9125],[126.833333,-9.333333],[129.0,-9.409722],[129.0,-14.879444],[128.416667,-14.833333],[127.5,-14.0],[126.148056,-13.751667],[124.0,-14.0],[124.774444,-10.9125]]]}},{"type":"Feature","properties":{"area_code":"AREA-87","name":"QNH_AREA_87","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.0,-18.0],[118.0,-15.0],[124.0,-14.0],[117.0,-18.0],[112.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-88","name":"QNH_AREA_88","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[110.0,-19.0],[112.0,-18.0],[117.0,-18.0],[113.0,-21.0],[110.0,-19.0]]]}}]};
+
+    // Regional bounds for map exports (similar to BOM regions)
+    const EXPORT_REGIONS = {
+      'AU': { // Full Australia
+        bounds: [[110, -45], [163, -9]],
+        name: 'Australia'
+      },
+      'NE': { // Northeast (QLD/North NSW)
+        bounds: [[138, -30], [163, -9]],
+        name: 'Northeast'
+      },
+      'SE': { // Southeast (VIC/TAS/South NSW)
+        bounds: [[138, -45], [163, -30]],
+        name: 'Southeast'
+      },
+      'NW': { // Northwest (NT/North WA)
+        bounds: [[110, -30], [138, -9]],
+        name: 'Northwest'
+      },
+      'SW': { // Southwest (SA/South WA)
+        bounds: [[110, -45], [138, -30]],
+        name: 'Southwest'
+      }
+    };
 
     let areaGeoJSON = null;
     let areaQnhMap = {};
@@ -198,7 +289,8 @@
           },
           center: [134.5, -25.5],
           zoom: 3.6,
-          failIfMajorPerformanceCaveat: false
+          failIfMajorPerformanceCaveat: false,
+          preserveDrawingBuffer: true // Required for canvas capture/export
         });
 
         map.addControl(new maplibregl.NavigationControl(), 'top-left');
@@ -577,6 +669,9 @@
           : `Areas: ${areaCount}/${totalAreas}${splitCount ? ` (${splitCount} split)` : ''}`;
           
         showSuccess(`QNH data updated successfully (${areaCount} areas, ${splitCount} with splits)`);
+
+        // Auto-export regional maps to R2 when new data arrives
+        autoExportToR2();
       } catch (err) {
         console.error('Failed to fetch/parse QNH:', err);
         validityBox.textContent = 'Failed to fetch QNH data';
@@ -1650,6 +1745,227 @@
 
       console.log(`Drew ${solidLineFeatures.length} solid lines, ${dashedLineFeatures.length} dashed lines, ${splitLabelFeatures.length} split labels, and ${pointFeatures.length} reference points`);
     }
+
+    // Auto-export all regions to R2 when new QNH data arrives
+    async function autoExportToR2() {
+      console.log('Starting auto-export to R2...');
+
+      // Wait for map to fully render after data update
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      const regions = ['AU', 'NE', 'SE', 'NW', 'SW'];
+      let successCount = 0;
+
+      for (const regionCode of regions) {
+        try {
+          await exportRegionToR2(regionCode);
+          successCount++;
+
+          // Small delay between sequential exports to let map settle
+          if (successCount < regions.length) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        } catch (error) {
+          console.error(`Failed to export ${regionCode} to R2:`, error);
+        }
+      }
+
+      console.log(`Auto-export complete: ${successCount}/${regions.length} regions uploaded to R2`);
+    }
+
+    // Upload image to R2 via Cloudflare Worker
+    async function uploadImageToR2(blob, filename) {
+      try {
+        const formData = new FormData();
+        formData.append('file', blob, filename);
+
+        const response = await fetchWithTimeout(UPLOAD_WORKER_URL, {
+          method: 'POST',
+          body: formData
+        }, 60000); // 60 second timeout for upload
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+        }
+
+        const result = await response.json();
+        return result;
+      } catch (error) {
+        console.error('Upload to R2 failed:', error);
+        throw error;
+      }
+    }
+
+    // Wait for map to be fully rendered including all tiles
+    function waitForMapIdle() {
+      return new Promise(resolve => {
+        // Wait for 'idle' event which fires when map is done rendering
+        const onIdle = () => {
+          map.off('idle', onIdle);
+          resolve();
+        };
+
+        // If map is already idle, resolve immediately
+        if (!map.isMoving() && map.loaded() && !map.areTilesLoaded || map.areTilesLoaded()) {
+          resolve();
+        } else {
+          map.once('idle', onIdle);
+        }
+
+        // Fallback timeout in case idle event doesn't fire
+        setTimeout(() => {
+          map.off('idle', onIdle);
+          resolve();
+        }, 5000);
+      });
+    }
+
+    // Export region to R2 (no download)
+    async function exportRegionToR2(regionCode) {
+      if (!map || !map.loaded()) {
+        throw new Error('Map is not ready');
+      }
+
+      const region = EXPORT_REGIONS[regionCode];
+      if (!region) {
+        throw new Error(`Unknown region: ${regionCode}`);
+      }
+
+      // Store current view
+      const currentCenter = map.getCenter();
+      const currentZoom = map.getZoom();
+
+      try {
+        // Fit map to region bounds
+        const mapBounds = new maplibregl.LngLatBounds(region.bounds[0], region.bounds[1]);
+        map.fitBounds(mapBounds, {
+          padding: 10, // Minimal padding for tight crop like BOM
+          duration: 0,
+          maxZoom: 6
+        });
+
+        // Wait for map to be fully rendered including tiles
+        await waitForMapIdle();
+
+        // Extra wait to ensure all layers are drawn
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // Get canvas and convert to blob
+        const canvas = map.getCanvas();
+
+        // Check if canvas has content
+        const ctx = canvas.getContext('2d');
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const hasContent = imageData.data.some(channel => channel !== 0);
+
+        if (!hasContent) {
+          console.warn(`Canvas appears blank for ${regionCode}, waiting longer...`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+
+        const blob = await new Promise(resolve => {
+          canvas.toBlob(resolve, 'image/png', 1.0); // Max quality
+        });
+
+        if (!blob || blob.size < 1000) {
+          throw new Error(`Generated image is too small (${blob?.size || 0} bytes) - likely blank`);
+        }
+
+        // Upload to R2
+        const filename = `IDYA0002.QNH.${regionCode}.png`;
+        await uploadImageToR2(blob, filename);
+
+        console.log(`Uploaded ${filename} to R2 (${blob.size} bytes)`);
+
+        // Restore original view
+        map.jumpTo({
+          center: currentCenter,
+          zoom: currentZoom
+        });
+
+        return filename;
+      } catch (error) {
+        // Restore view on error
+        map.jumpTo({
+          center: currentCenter,
+          zoom: currentZoom
+        });
+        throw error;
+      }
+    }
+
+    // Export functionality
+    function toggleExportPanel() {
+      const panel = document.getElementById('exportControls');
+      panel.classList.toggle('visible');
+    }
+
+    async function exportRegion(regionCode) {
+      if (!map || !map.loaded()) {
+        showWarning('Map is not ready yet. Please wait for the map to finish loading.');
+        return;
+      }
+
+      try {
+        let bounds, regionName;
+
+        if (regionCode === 'CURRENT') {
+          // Export current view
+          regionName = 'Current View';
+          // No need to change bounds, use current view
+        } else {
+          // Export predefined region
+          const region = EXPORT_REGIONS[regionCode];
+          if (!region) {
+            showWarning(`Unknown region: ${regionCode}`);
+            return;
+          }
+
+          bounds = region.bounds;
+          regionName = region.name;
+
+          // Fit map to region bounds
+          const mapBounds = new maplibregl.LngLatBounds(bounds[0], bounds[1]);
+          map.fitBounds(mapBounds, {
+            padding: 10, // Minimal padding for tight crop like BOM
+            duration: 0, // No animation for export
+            maxZoom: 6
+          });
+
+          // Wait for map to render at new bounds
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        // Get the map canvas and export as image
+        const canvas = map.getCanvas();
+        const dataURL = canvas.toDataURL('image/png');
+
+        // Create timestamp for filename
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[:.]/g, '-').split('T')[0];
+        const filename = `IDYA0002.QNH.${regionCode}.${timestamp}.png`;
+
+        // Download the image
+        const link = document.createElement('a');
+        link.download = filename;
+        link.href = dataURL;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showSuccess(`Exported ${regionName} map as ${filename}`);
+        console.log(`Exported map region: ${regionCode} as ${filename}`);
+
+      } catch (error) {
+        console.error('Export failed:', error);
+        showWarning(`Failed to export map: ${error.message}`);
+      }
+    }
+
+    // Make functions globally accessible
+    window.toggleExportPanel = toggleExportPanel;
+    window.exportRegion = exportRegion;
 
   </script>
 </body>
