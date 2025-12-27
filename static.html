@@ -18,9 +18,7 @@
       --error: #f85149;
     }
 
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -78,9 +76,7 @@
       animation: pulse 2s infinite;
     }
 
-    .status-dot.error {
-      background: var(--error);
-    }
+    .status-dot.error { background: var(--error); }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; }
@@ -132,9 +128,7 @@
       box-shadow: 0 8px 24px rgba(0,0,0,0.4);
     }
 
-    .region-card.featured {
-      grid-column: 1 / -1;
-    }
+    .region-card.featured { grid-column: 1 / -1; }
 
     .region-header {
       padding: 12px 16px;
@@ -168,9 +162,7 @@
       justify-content: center;
     }
 
-    .region-card.featured .region-image-container {
-      min-height: 500px;
-    }
+    .region-card.featured .region-image-container { min-height: 500px; }
 
     .region-image {
       width: 100%;
@@ -180,9 +172,7 @@
       transition: opacity 0.3s;
     }
 
-    .region-image.loaded {
-      opacity: 1;
-    }
+    .region-image.loaded { opacity: 1; }
 
     .loading-spinner {
       position: absolute;
@@ -194,13 +184,9 @@
       animation: spin 1s linear infinite;
     }
 
-    .loading-spinner.hidden {
-      display: none;
-    }
+    .loading-spinner.hidden { display: none; }
 
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
 
     .error-message {
       position: absolute;
@@ -243,9 +229,7 @@
       font-weight: 500;
     }
 
-    .download-btn:hover {
-      filter: brightness(1.1);
-    }
+    .download-btn:hover { filter: brightness(1.1); }
 
     footer {
       text-align: center;
@@ -256,23 +240,12 @@
       margin-top: 24px;
     }
 
-    footer a {
-      color: var(--accent);
-    }
+    footer a { color: var(--accent); }
 
     @media (max-width: 768px) {
-      .region-grid {
-        grid-template-columns: 1fr;
-      }
-      
-      .header-content {
-        flex-direction: column;
-        align-items: flex-start;
-      }
-
-      main {
-        padding: 16px;
-      }
+      .region-grid { grid-template-columns: 1fr; }
+      .header-content { flex-direction: column; align-items: flex-start; }
+      main { padding: 16px; }
     }
 
     @media print {
@@ -301,7 +274,6 @@
 
   <main>
     <div class="region-grid" id="regionGrid">
-      <!-- Australia Full -->
       <div class="region-card featured" data-region="AU">
         <div class="region-header">
           <span class="region-title">Australia (Full)</span>
@@ -323,7 +295,6 @@
         </div>
       </div>
 
-      <!-- Northeast -->
       <div class="region-card" data-region="NE">
         <div class="region-header">
           <span class="region-title">Northeast (QLD / North NSW)</span>
@@ -345,7 +316,6 @@
         </div>
       </div>
 
-      <!-- Southeast -->
       <div class="region-card" data-region="SE">
         <div class="region-header">
           <span class="region-title">Southeast (VIC / TAS / South NSW)</span>
@@ -367,7 +337,6 @@
         </div>
       </div>
 
-      <!-- Northwest -->
       <div class="region-card" data-region="NW">
         <div class="region-header">
           <span class="region-title">Northwest (NT / North WA)</span>
@@ -389,7 +358,6 @@
         </div>
       </div>
 
-      <!-- Southwest -->
       <div class="region-card" data-region="SW">
         <div class="region-header">
           <span class="region-title">Southwest (SA / South WA)</span>
@@ -415,18 +383,22 @@
 
   <footer>
     <p>
-      Data sourced from Bureau of Meteorology. 
+      Data sourced from Bureau of Meteorology.
       Images auto-generated every 5 minutes by server.
       <br>
-      <a href="index.html">View Interactive Map</a> | 
+      <a href="index.html">View Interactive Map</a> |
       Built for Australian aviation.
     </p>
   </footer>
 
   <script>
-    // Configuration - Update this URL to your R2 worker endpoint
-    const R2_BASE_URL = 'https://qnh-images.therealleviticus.workers.dev/';
-    
+    // IMPORTANT:
+    // If you use fetch() against R2/Worker without CORS headers, it will fail.
+    // This page now loads images directly (no fetch), so it works without CORS.
+
+    const R2_BASE_URL_RAW = 'https://qnh-images.therealleviticus.workers.dev/';
+    const R2_BASE_URL = R2_BASE_URL_RAW.replace(/\/+$/, ''); // trim trailing slashes
+
     const regions = ['AU', 'NE', 'SE', 'NW', 'SW'];
     let loadedCount = 0;
     let errorCount = 0;
@@ -447,9 +419,9 @@
       const spinner = document.getElementById(`spinner-${region}`);
       const errorDiv = document.getElementById(`error-${region}`);
       const timeSpan = document.getElementById(`time-${region}`);
-      
+
       if (spinner) spinner.classList.add('hidden');
-      
+
       if (errorDiv) {
         errorDiv.innerHTML = `
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -461,11 +433,9 @@
         `;
         errorDiv.style.display = 'block';
       }
-      
-      if (timeSpan) {
-        timeSpan.textContent = 'Unavailable';
-      }
-      
+
+      if (timeSpan) timeSpan.textContent = 'Unavailable';
+
       errorCount++;
       updateStatus();
     }
@@ -473,7 +443,7 @@
     function updateStatus() {
       const statusDot = document.getElementById('statusDot');
       const lastUpdate = document.getElementById('lastUpdate');
-      
+
       if (errorCount === regions.length) {
         statusDot.classList.add('error');
         lastUpdate.textContent = 'All images unavailable';
@@ -486,86 +456,62 @@
       }
     }
 
-    async function loadImage(region) {
+    function loadImage(region) {
       const img = document.getElementById(`img-${region}`);
       const spinner = document.getElementById(`spinner-${region}`);
       const errorDiv = document.getElementById(`error-${region}`);
       const timeSpan = document.getElementById(`time-${region}`);
       const downloadBtn = document.getElementById(`download-${region}`);
-      
-      // Reset state
+
       img.classList.remove('loaded');
       if (spinner) spinner.classList.remove('hidden');
       if (errorDiv) errorDiv.style.display = 'none';
-      
-      const imageUrl = `${R2_BASE_URL}/qnh-${region.toLowerCase()}.png?t=${Date.now()}`;
-      
-      try {
-        // Fetch to check availability and get headers
-        const response = await fetch(imageUrl, { method: 'HEAD' });
-        
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
 
-        // Load the actual image
-        await new Promise((resolve, reject) => {
-          img.onload = () => {
-            img.classList.add('loaded');
-            if (spinner) spinner.classList.add('hidden');
-            
-            const lastModified = response.headers.get('last-modified');
-            if (lastModified) {
-              timeSpan.textContent = `Updated: ${formatTimestamp(new Date(lastModified))}`;
-            } else {
-              timeSpan.textContent = `Loaded: ${formatTimestamp(new Date())}`;
-            }
-            
-            downloadBtn.href = imageUrl;
-            loadedCount++;
-            updateStatus();
-            resolve();
-          };
+      const imageUrl = `${R2_BASE_URL}/qnh-${region.toLowerCase()}.png?cb=${Date.now()}`;
 
-          img.onerror = () => {
-            reject(new Error('Failed to load image'));
-          };
+      img.onload = () => {
+        img.classList.add('loaded');
+        if (spinner) spinner.classList.add('hidden');
 
-          img.src = imageUrl;
-        });
-        
-      } catch (error) {
-        console.error(`Failed to load ${region}:`, error);
+        if (timeSpan) timeSpan.textContent = `Loaded: ${formatTimestamp(new Date())}`;
+
+        if (downloadBtn) downloadBtn.href = imageUrl;
+
+        loadedCount++;
+        updateStatus();
+      };
+
+      img.onerror = () => {
         showError(region, 'Image not available');
-      }
+      };
+
+      img.src = imageUrl;
     }
 
     function refreshImages() {
       loadedCount = 0;
       errorCount = 0;
-      
-      document.getElementById('lastUpdate').textContent = 'Refreshing...';
-      
-      // Reset all images
+
+      const lastUpdate = document.getElementById('lastUpdate');
+      if (lastUpdate) lastUpdate.textContent = 'Refreshing...';
+
       regions.forEach(region => {
         const img = document.getElementById(`img-${region}`);
         const spinner = document.getElementById(`spinner-${region}`);
         const errorDiv = document.getElementById(`error-${region}`);
-        
-        img.classList.remove('loaded');
-        img.src = '';
+
+        if (img) {
+          img.classList.remove('loaded');
+          img.src = '';
+        }
         if (spinner) spinner.classList.remove('hidden');
         if (errorDiv) errorDiv.style.display = 'none';
       });
 
-      // Load all images
       regions.forEach(region => loadImage(region));
     }
 
-    // Initial load
     document.addEventListener('DOMContentLoaded', refreshImages);
-
-    // Expose refresh function
     window.refreshImages = refreshImages;
   </script>
 </body>
