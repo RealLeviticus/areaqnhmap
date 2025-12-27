@@ -5,16 +5,17 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Area QNH Static Maps</title>
   <meta name="description" content="Static Area QNH maps for Australian aviation" />
-  <meta http-equiv="refresh" content="180"> <!-- Auto-refresh every 3 minutes -->
+  <meta http-equiv="refresh" content="180">
   <style>
     :root {
-      --bg: #f5f5f5;
-      --card-bg: #ffffff;
-      --border: #e0e0e0;
-      --text: #333;
-      --text-muted: #666;
-      --accent: #0066cc;
-      --success: #28a745;
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text: #e6edf3;
+      --text-muted: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --error: #f85149;
     }
 
     * {
@@ -37,7 +38,6 @@
       position: sticky;
       top: 0;
       z-index: 100;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
     }
 
     .header-content {
@@ -78,6 +78,10 @@
       animation: pulse 2s infinite;
     }
 
+    .status-dot.error {
+      background: var(--error);
+    }
+
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
@@ -92,10 +96,15 @@
       color: var(--accent);
       text-decoration: none;
       font-size: 0.9rem;
+      padding: 6px 12px;
+      border: 1px solid var(--accent);
+      border-radius: 4px;
+      transition: all 0.2s;
     }
 
     .nav-links a:hover {
-      text-decoration: underline;
+      background: var(--accent);
+      color: var(--bg);
     }
 
     main {
@@ -115,13 +124,12 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
       transition: transform 0.2s, box-shadow 0.2s;
     }
 
     .region-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
     }
 
     .region-card.featured {
@@ -130,7 +138,7 @@
 
     .region-header {
       padding: 12px 16px;
-      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      background: linear-gradient(135deg, #1c2128 0%, #161b22 100%);
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
@@ -144,7 +152,7 @@
 
     .region-code {
       background: var(--accent);
-      color: white;
+      color: var(--bg);
       padding: 2px 8px;
       border-radius: 4px;
       font-size: 0.75rem;
@@ -153,8 +161,11 @@
 
     .region-image-container {
       position: relative;
-      background: #f0f0f0;
+      background: #0d1117;
       min-height: 300px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .region-card.featured .region-image-container {
@@ -165,17 +176,16 @@
       width: 100%;
       height: auto;
       display: block;
+      opacity: 0;
+      transition: opacity 0.3s;
     }
 
-    .region-image.loading {
-      opacity: 0;
+    .region-image.loaded {
+      opacity: 1;
     }
 
     .loading-spinner {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
       width: 40px;
       height: 40px;
       border: 3px solid var(--border);
@@ -184,15 +194,16 @@
       animation: spin 1s linear infinite;
     }
 
+    .loading-spinner.hidden {
+      display: none;
+    }
+
     @keyframes spin {
-      to { transform: translate(-50%, -50%) rotate(360deg); }
+      to { transform: rotate(360deg); }
     }
 
     .error-message {
       position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
       text-align: center;
       color: var(--text-muted);
       padding: 20px;
@@ -203,11 +214,12 @@
       height: 48px;
       margin-bottom: 12px;
       opacity: 0.5;
+      stroke: var(--error);
     }
 
     .region-footer {
       padding: 10px 16px;
-      background: #fafafa;
+      background: #1c2128;
       border-top: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
@@ -218,7 +230,7 @@
 
     .download-btn {
       background: var(--accent);
-      color: white;
+      color: var(--bg);
       border: none;
       padding: 6px 12px;
       border-radius: 4px;
@@ -228,10 +240,11 @@
       display: inline-flex;
       align-items: center;
       gap: 4px;
+      font-weight: 500;
     }
 
     .download-btn:hover {
-      background: #0052a3;
+      filter: brightness(1.1);
     }
 
     footer {
@@ -247,7 +260,6 @@
       color: var(--accent);
     }
 
-    /* Responsive */
     @media (max-width: 768px) {
       .region-grid {
         grid-template-columns: 1fr;
@@ -263,16 +275,9 @@
       }
     }
 
-    /* Print styles */
     @media print {
-      header, footer, .download-btn {
-        display: none;
-      }
-      
-      .region-card {
-        break-inside: avoid;
-        page-break-inside: avoid;
-      }
+      header, footer, .download-btn { display: none; }
+      .region-card { break-inside: avoid; }
     }
   </style>
 </head>
@@ -284,11 +289,11 @@
         <p class="subtitle">Australian aviation altimeter setting regions</p>
       </div>
       <div class="status">
-        <span class="status-dot"></span>
+        <span class="status-dot" id="statusDot"></span>
         <span id="lastUpdate">Loading...</span>
       </div>
       <nav class="nav-links">
-        <a href="../">← Interactive Map</a>
+        <a href="index.html">← Interactive Map</a>
         <a href="#" onclick="refreshImages(); return false;">↻ Refresh</a>
       </nav>
     </div>
@@ -304,7 +309,8 @@
         </div>
         <div class="region-image-container">
           <div class="loading-spinner" id="spinner-AU"></div>
-          <img class="region-image loading" id="img-AU" alt="Australia QNH Map" />
+          <div class="error-message" id="error-AU" style="display:none;"></div>
+          <img class="region-image" id="img-AU" alt="Australia QNH Map" />
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-AU">Loading...</span>
@@ -325,7 +331,8 @@
         </div>
         <div class="region-image-container">
           <div class="loading-spinner" id="spinner-NE"></div>
-          <img class="region-image loading" id="img-NE" alt="Northeast QNH Map" />
+          <div class="error-message" id="error-NE" style="display:none;"></div>
+          <img class="region-image" id="img-NE" alt="Northeast QNH Map" />
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-NE">Loading...</span>
@@ -346,7 +353,8 @@
         </div>
         <div class="region-image-container">
           <div class="loading-spinner" id="spinner-SE"></div>
-          <img class="region-image loading" id="img-SE" alt="Southeast QNH Map" />
+          <div class="error-message" id="error-SE" style="display:none;"></div>
+          <img class="region-image" id="img-SE" alt="Southeast QNH Map" />
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-SE">Loading...</span>
@@ -367,7 +375,8 @@
         </div>
         <div class="region-image-container">
           <div class="loading-spinner" id="spinner-NW"></div>
-          <img class="region-image loading" id="img-NW" alt="Northwest QNH Map" />
+          <div class="error-message" id="error-NW" style="display:none;"></div>
+          <img class="region-image" id="img-NW" alt="Northwest QNH Map" />
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-NW">Loading...</span>
@@ -388,7 +397,8 @@
         </div>
         <div class="region-image-container">
           <div class="loading-spinner" id="spinner-SW"></div>
-          <img class="region-image loading" id="img-SW" alt="Southwest QNH Map" />
+          <div class="error-message" id="error-SW" style="display:none;"></div>
+          <img class="region-image" id="img-SW" alt="Southwest QNH Map" />
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-SW">Loading...</span>
@@ -406,18 +416,20 @@
   <footer>
     <p>
       Data sourced from Bureau of Meteorology. 
-      Images auto-refresh every 3 minutes.
+      Images auto-generated every 5 minutes by server.
       <br>
-      <a href="../">View Interactive Map</a> | 
+      <a href="index.html">View Interactive Map</a> | 
       Built for Australian aviation.
     </p>
   </footer>
 
   <script>
-    // Configuration - Update this URL to your R2 public bucket or worker endpoint
-    const R2_BASE_URL = 'https://imageupload.therealleviticus.workers.dev';
+    // Configuration - Update this URL to your R2 worker endpoint
+    const R2_BASE_URL = 'https://qnh-images.thereallevitiucs.workers.dev/';
     
     const regions = ['AU', 'NE', 'SE', 'NW', 'SW'];
+    let loadedCount = 0;
+    let errorCount = 0;
 
     function formatTimestamp(date) {
       return date.toLocaleString('en-AU', {
@@ -432,104 +444,128 @@
     }
 
     function showError(region, message) {
-      const container = document.querySelector(`[data-region="${region}"] .region-image-container`);
       const spinner = document.getElementById(`spinner-${region}`);
+      const errorDiv = document.getElementById(`error-${region}`);
+      const timeSpan = document.getElementById(`time-${region}`);
       
-      if (spinner) spinner.style.display = 'none';
+      if (spinner) spinner.classList.add('hidden');
       
-      // Check if error message already exists
-      let errorDiv = container.querySelector('.error-message');
-      if (!errorDiv) {
-        errorDiv = document.createElement('div');
-        errorDiv.className = 'error-message';
-        container.appendChild(errorDiv);
+      if (errorDiv) {
+        errorDiv.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/>
+            <line x1="12" y1="8" x2="12" y2="12"/>
+            <line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <p>${message}</p>
+        `;
+        errorDiv.style.display = 'block';
       }
       
-      errorDiv.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/>
-          <line x1="12" y1="8" x2="12" y2="12"/>
-          <line x1="12" y1="16" x2="12.01" y2="16"/>
-        </svg>
-        <p>${message}</p>
-      `;
+      if (timeSpan) {
+        timeSpan.textContent = 'Unavailable';
+      }
+      
+      errorCount++;
+      updateStatus();
+    }
+
+    function updateStatus() {
+      const statusDot = document.getElementById('statusDot');
+      const lastUpdate = document.getElementById('lastUpdate');
+      
+      if (errorCount === regions.length) {
+        statusDot.classList.add('error');
+        lastUpdate.textContent = 'All images unavailable';
+      } else if (errorCount > 0) {
+        statusDot.classList.remove('error');
+        lastUpdate.textContent = `${loadedCount}/${regions.length} loaded • ${formatTimestamp(new Date())}`;
+      } else {
+        statusDot.classList.remove('error');
+        lastUpdate.textContent = `All images loaded • ${formatTimestamp(new Date())}`;
+      }
     }
 
     async function loadImage(region) {
       const img = document.getElementById(`img-${region}`);
       const spinner = document.getElementById(`spinner-${region}`);
+      const errorDiv = document.getElementById(`error-${region}`);
       const timeSpan = document.getElementById(`time-${region}`);
       const downloadBtn = document.getElementById(`download-${region}`);
       
-      // Add cache-busting timestamp
+      // Reset state
+      img.classList.remove('loaded');
+      if (spinner) spinner.classList.remove('hidden');
+      if (errorDiv) errorDiv.style.display = 'none';
+      
       const imageUrl = `${R2_BASE_URL}/qnh-${region.toLowerCase()}.png?t=${Date.now()}`;
       
       try {
-        // First, try to fetch to check if image exists
+        // Fetch to check availability and get headers
         const response = await fetch(imageUrl, { method: 'HEAD' });
         
         if (!response.ok) {
-          throw new Error('Image not available');
+          throw new Error(`HTTP ${response.status}`);
         }
 
-        // Load the image
-        img.onload = () => {
-          img.classList.remove('loading');
-          if (spinner) spinner.style.display = 'none';
-          
-          // Update timestamp
-          const lastModified = response.headers.get('last-modified');
-          if (lastModified) {
-            timeSpan.textContent = `Updated: ${formatTimestamp(new Date(lastModified))}`;
-          } else {
-            timeSpan.textContent = `Loaded: ${formatTimestamp(new Date())}`;
-          }
-          
-          // Update download link
-          downloadBtn.href = imageUrl;
-        };
+        // Load the actual image
+        await new Promise((resolve, reject) => {
+          img.onload = () => {
+            img.classList.add('loaded');
+            if (spinner) spinner.classList.add('hidden');
+            
+            const lastModified = response.headers.get('last-modified');
+            if (lastModified) {
+              timeSpan.textContent = `Updated: ${formatTimestamp(new Date(lastModified))}`;
+            } else {
+              timeSpan.textContent = `Loaded: ${formatTimestamp(new Date())}`;
+            }
+            
+            downloadBtn.href = imageUrl;
+            loadedCount++;
+            updateStatus();
+            resolve();
+          };
 
-        img.onerror = () => {
-          showError(region, 'Failed to load image');
-        };
+          img.onerror = () => {
+            reject(new Error('Failed to load image'));
+          };
 
-        img.src = imageUrl;
+          img.src = imageUrl;
+        });
         
       } catch (error) {
         console.error(`Failed to load ${region}:`, error);
-        showError(region, 'Image not available yet');
+        showError(region, 'Image not available');
       }
     }
 
     function refreshImages() {
+      loadedCount = 0;
+      errorCount = 0;
+      
+      document.getElementById('lastUpdate').textContent = 'Refreshing...';
+      
       // Reset all images
       regions.forEach(region => {
         const img = document.getElementById(`img-${region}`);
         const spinner = document.getElementById(`spinner-${region}`);
-        const errorDiv = document.querySelector(`[data-region="${region}"] .error-message`);
+        const errorDiv = document.getElementById(`error-${region}`);
         
-        img.classList.add('loading');
+        img.classList.remove('loaded');
         img.src = '';
-        if (spinner) spinner.style.display = 'block';
-        if (errorDiv) errorDiv.remove();
+        if (spinner) spinner.classList.remove('hidden');
+        if (errorDiv) errorDiv.style.display = 'none';
       });
 
-      // Reload all images
+      // Load all images
       regions.forEach(region => loadImage(region));
-      
-      // Update status
-      document.getElementById('lastUpdate').textContent = `Last check: ${formatTimestamp(new Date())}`;
     }
 
     // Initial load
-    document.addEventListener('DOMContentLoaded', () => {
-      refreshImages();
-      
-      // Also update timestamp in header
-      document.getElementById('lastUpdate').textContent = `Last check: ${formatTimestamp(new Date())}`;
-    });
+    document.addEventListener('DOMContentLoaded', refreshImages);
 
-    // Manual refresh is available via the Refresh link in nav
+    // Expose refresh function
     window.refreshImages = refreshImages;
   </script>
 </body>
