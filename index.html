@@ -4,1662 +4,351 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Area QNH Map</title>
-  <link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet" crossorigin="anonymous" />
+  <link href="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.css" rel="stylesheet" />
   <style>
-    :root {
-      --panel: #f7f7f7;
-      --stroke: #d6d6d6;
-      --label-red: #c40000;
-      --warn-bg: #fff4d7;
-      --warn-border: #f0c96a;
-      --warn-text: #7a5a05;
-      --success-bg: #d4edda;
-      --success-border: #c3e6cb;
-      --success-text: #155724;
-    }
-    body {
-      margin: 0;
-      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
-      background: #ffffff;
-      color: #111;
-      display: grid;
-      grid-template-rows: auto 1fr;
-      min-height: 100vh;
-    }
-    header {
-      padding: 14px 18px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      background: var(--panel);
-      border-bottom: 1px solid var(--stroke);
-      gap: 8px;
-      flex-wrap: wrap;
-    }
-    .title h1 { margin: 0; font-size: 1.1rem; }
-    .title .sub { margin: 0; font-size: 0.9rem; color: #555; }
-    #validity {
-      margin-left: auto;
-      font-size: 0.9rem;
-      color: #444;
-      white-space: nowrap;
-    }
-    main {
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-    }
-    #warning, #success {
-      margin-bottom: 12px;
-      padding: 10px 12px;
-      border: 1px solid var(--warn-border);
-      border-radius: 10px;
-      background: var(--warn-bg);
-      color: var(--warn-text);
-      font-size: 0.95rem;
-      display: none;
-    }
-    #success {
-      background: var(--success-bg);
-      border-color: var(--success-border);
-      color: var(--success-text);
-    }
-    #map {
-      width: 100%;
-      height: 100%;
-      flex: 1 1 auto;
-      min-height: 0;
-      border: 1px solid var(--stroke);
-      border-radius: 12px;
-      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.18);
-      background: #edf1f5;
-    }
-    .legend {
-      position: absolute;
-      bottom: 30px;
-      right: 10px;
-      background: rgba(255, 255, 255, 0.95);
-      padding: 12px;
-      border-radius: 8px;
-      border: 1px solid var(--stroke);
-      font-size: 0.85rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      z-index: 1;
-    }
-    .legend h4 {
-      margin: 0 0 8px 0;
-      font-size: 0.9rem;
-      font-weight: 600;
-    }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin: 4px 0;
-    }
-    .legend-line {
-      width: 24px;
-      height: 3px;
-      background: #1f9e45;
-    }
-    .legend-point {
-      width: 16px;
-      height: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 14px;
-    }
-    .export-controls {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: rgba(255, 255, 255, 0.95);
-      padding: 10px;
-      border-radius: 8px;
-      border: 1px solid var(--stroke);
-      font-size: 0.85rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      z-index: 1;
-      display: none;
-    }
-    .export-controls.visible {
-      display: block;
-    }
-    .export-controls h4 {
-      margin: 0 0 8px 0;
-      font-size: 0.9rem;
-      font-weight: 600;
-    }
-    .export-btn {
-      display: block;
-      width: 100%;
-      padding: 6px 12px;
-      margin: 4px 0;
-      background: #1f9e45;
-      color: white;
-      border: none;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.85rem;
-      transition: background 0.2s;
-    }
-    .export-btn:hover {
-      background: #17803a;
-    }
-    .export-btn:active {
-      background: #136030;
-    }
-    .toggle-export-btn {
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: rgba(255, 255, 255, 0.95);
-      padding: 8px 12px;
-      border-radius: 8px;
-      border: 1px solid var(--stroke);
-      cursor: pointer;
-      font-size: 0.85rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-      z-index: 2;
-    }
-    .toggle-export-btn:hover {
-      background: rgba(255, 255, 255, 1);
-    }
+    :root { --bg: #0d1117; --card-bg: #161b22; --border: #30363d; --text: #e6edf3; --text-muted: #8b949e; --accent: #58a6ff; --success: #3fb950; --error: #f85149; --warning: #d29922; --area-color: #f85149; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body { font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--text); display: flex; flex-direction: column; }
+    header { background: var(--card-bg); border-bottom: 1px solid var(--border); padding: 12px 20px; flex-shrink: 0; }
+    .header-content { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    h1 { font-size: 1.4rem; font-weight: 600; }
+    .subtitle { color: var(--text-muted); font-size: 0.85rem; margin-top: 2px; }
+    #validity { font-size: 0.85rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); animation: pulse 2s infinite; }
+    .status-dot.loading { background: var(--warning); }
+    .status-dot.error { background: var(--error); animation: none; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .nav-links a { color: var(--accent); text-decoration: none; font-size: 0.9rem; padding: 6px 12px; border: 1px solid var(--accent); border-radius: 6px; transition: all 0.2s; }
+    .nav-links a:hover { background: var(--accent); color: var(--bg); }
+    #warning, #success { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); padding: 12px 20px; border-radius: 8px; font-size: 0.9rem; display: none; z-index: 1000; }
+    #warning { background: rgba(210, 153, 34, 0.95); border: 1px solid var(--warning); color: #000; }
+    #success { background: rgba(63, 185, 80, 0.95); border: 1px solid var(--success); color: #000; }
+    #map { flex: 1; width: 100%; }
+    .legend { position: absolute; bottom: 30px; right: 10px; background: rgba(22, 27, 34, 0.95); padding: 12px 16px; border-radius: 8px; border: 1px solid var(--border); font-size: 0.85rem; z-index: 1; }
+    .legend h4 { margin: 0 0 10px 0; font-size: 0.9rem; font-weight: 600; }
+    .legend-item { display: flex; align-items: center; gap: 10px; margin: 6px 0; color: var(--text-muted); }
+    .legend-line { width: 24px; height: 3px; border-radius: 2px; }
+    .legend-line.red { background: var(--area-color); }
+    .legend-line.green { background: var(--success); }
+    .legend-point { width: 20px; text-align: center; font-weight: bold; font-size: 14px; color: var(--text); }
+    .maplibregl-ctrl-attrib { background: rgba(22, 27, 34, 0.8) !important; color: var(--text-muted) !important; }
+    .maplibregl-ctrl-attrib a { color: var(--accent) !important; }
+    .maplibregl-ctrl-group { background: var(--card-bg) !important; border: 1px solid var(--border) !important; }
+    .maplibregl-ctrl-group button { background-color: var(--card-bg) !important; }
+    .maplibregl-ctrl-group button:hover { background-color: var(--bg) !important; }
+    .maplibregl-ctrl-group button span { filter: invert(1); }
+    @media (max-width: 768px) { .header-content { flex-direction: column; align-items: flex-start; } header { padding: 10px 12px; } }
   </style>
 </head>
 <body>
   <header>
-    <div class="title">
-      <h1>Area QNH Map</h1>
-      <p class="sub">Replica of the BOM Area QNH Map removed from the new BOM website.</p>
+    <div class="header-content">
+      <div><h1>Area QNH Map</h1><p class="subtitle">Australian aviation altimeter setting regions</p></div>
+      <div id="validity"><span class="status-dot loading" id="statusDot"></span><span id="validityText">Loading...</span></div>
+      <nav class="nav-links"><a href="static.html">Static Images →</a></nav>
     </div>
-    <div id="validity">Fetching QNH...</div>
   </header>
-
-  <main>
-    <div id="warning" role="status" aria-live="polite"></div>
-    <div id="success" role="status" aria-live="polite"></div>
-    <div id="map" aria-label="Area QNH map">
-      <button class="toggle-export-btn" onclick="toggleExportPanel()">Export Images</button>
-      <div class="export-controls" id="exportControls">
-        <h4>Export Regional Maps</h4>
-        <button class="export-btn" onclick="exportRegion('AU')">Australia (Full)</button>
-        <button class="export-btn" onclick="exportRegion('NE')">Northeast</button>
-        <button class="export-btn" onclick="exportRegion('SE')">Southeast</button>
-        <button class="export-btn" onclick="exportRegion('NW')">Northwest</button>
-        <button class="export-btn" onclick="exportRegion('SW')">Southwest</button>
-        <button class="export-btn" onclick="exportRegion('CURRENT')">Current View</button>
-        <hr style="margin: 8px 0; border: none; border-top: 1px solid #ddd;">
-        <button class="export-btn" onclick="manualExportAllToR2()" style="background: #0066cc;">Upload All to R2</button>
-      </div>
-      <div class="legend">
-        <h4>Legend</h4>
-        <div class="legend-item">
-          <div class="legend-line"></div>
-          <span>Split boundary</span>
-        </div>
-        <div class="legend-item">
-          <div class="legend-point">×</div>
-          <span>Reference point</span>
-        </div>
-      </div>
+  <div id="warning"></div>
+  <div id="success"></div>
+  <div id="map">
+    <div class="legend">
+      <h4>Legend</h4>
+      <div class="legend-item"><div class="legend-line red"></div><span>Area boundary</span></div>
+      <div class="legend-item"><div class="legend-line green"></div><span>Split boundary</span></div>
+      <div class="legend-item"><div class="legend-point">×</div><span>Reference point</span></div>
     </div>
-  </main>
-
-  <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js" crossorigin="anonymous"></script>
+  </div>
+  <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
   <script>
-    // Check if MapLibre loaded successfully
-    if (typeof maplibregl === 'undefined') {
-      document.getElementById('map').innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100%;text-align:center;padding:20px;"><div><h2>Map Library Failed to Load</h2><p>Please check your internet connection and refresh the page.</p></div></div>';
-      throw new Error('MapLibre GL JS failed to load');
-    }
+    // ===== CONFIGURATION =====
+    const MAPBOX_TOKEN = 'sk.eyJ1IjoibGV2aXRpY3VzIiwiYSI6ImNtam5yZWIxZzM2bW4zZXB5dDJlemx6MDQifQ.NhjD-T_riAAeFOhVEBQ1MQ';
+    const USE_MAPBOX = true;
+    // =========================
 
-    const warningBox = document.getElementById('warning');
-    const successBox = document.getElementById('success');
+    const $ = id => document.getElementById(id);
+    const showWarning = msg => { if(msg){$('warning').textContent=msg;$('warning').style.display='block';$('statusDot').className='status-dot error';setTimeout(()=>$('warning').style.display='none',8000);} };
+    const showSuccess = msg => { if(msg){$('success').textContent=msg;$('success').style.display='block';$('statusDot').className='status-dot';setTimeout(()=>$('success').style.display='none',5000);} };
+    
+    const QNH_URL = 'https://areaqnh.therealleviticus.workers.dev/', NAV_URL = 'https://airspace.therealleviticus.workers.dev/';
+    
+    const AREAS = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"area_code":"AREA-20"},"geometry":{"type":"Polygon","coordinates":[[[148.383333,-32.75],[150.0,-29.0],[154.703056,-28.043611],[155.0,-28.833333],[152.666667,-34.333333],[151.177222,-33.946111],[150.988333,-33.924444],[149.651944,-33.409444],[148.383333,-32.75]]]}},{"type":"Feature","properties":{"area_code":"AREA-21"},"geometry":{"type":"Polygon","coordinates":[[[146.924722,-36.195278],[148.383333,-32.75],[149.651944,-33.409444],[150.988333,-33.924444],[151.177222,-33.946111],[152.666667,-34.333333],[150.870556,-37.881111],[149.976111,-37.503889],[146.924722,-36.195278]]]}},{"type":"Feature","properties":{"area_code":"AREA-22"},"geometry":{"type":"Polygon","coordinates":[[[141.0,-29.0],[150.0,-29.0],[148.383333,-32.75],[146.924722,-36.195278],[141.0,-33.65],[141.0,-29.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-24"},"geometry":{"type":"Polygon","coordinates":[[[152.666667,-34.333333],[155.0,-28.833333],[163.0,-28.5],[163.0,-31.333333],[152.666667,-34.333333]]]}},{"type":"Feature","properties":{"area_code":"AREA-30"},"geometry":{"type":"Polygon","coordinates":[[[141.0,-33.65],[146.924722,-36.195278],[149.976111,-37.503889],[150.870556,-37.881111],[150.2,-39.57],[142.8575,-39.57],[141.0,-39.57],[141.0,-33.65]]]}},{"type":"Feature","properties":{"area_code":"AREA-40"},"geometry":{"type":"Polygon","coordinates":[[[147.820833,-23.156111],[152.864444,-23.155833],[154.703056,-28.043611],[150.0,-29.0],[148.183333,-23.566667],[147.820833,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-41"},"geometry":{"type":"Polygon","coordinates":[[[138.0,-26.0],[138.0,-23.156111],[147.820833,-23.156111],[148.183333,-23.566667],[150.0,-29.0],[141.0,-29.0],[141.0,-26.0],[138.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-43"},"geometry":{"type":"Polygon","coordinates":[[[138.0,-23.156111],[138.0,-19.0],[143.533333,-18.3],[147.820833,-23.156111],[138.0,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-44"},"geometry":{"type":"Polygon","coordinates":[[[143.533333,-18.3],[148.0,-18.283333],[152.864444,-23.155833],[147.820833,-23.156111],[143.533333,-18.3]]]}},{"type":"Feature","properties":{"area_code":"AREA-45"},"geometry":{"type":"Polygon","coordinates":[[[141.0,-9.833333],[141.033333,-9.616667],[142.083333,-9.261667],[142.805,-9.323889],[143.875,-9.133333],[144.233333,-9.4],[144.089167,-9.942778],[144.026667,-11.5],[144.072222,-11.725],[144.0,-12.0],[147.607778,-16.995833],[148.0,-18.283333],[143.533333,-18.3],[138.0,-19.0],[138.0,-14.0],[141.0,-9.833333]]]}},{"type":"Feature","properties":{"area_code":"AREA-50"},"geometry":{"type":"Polygon","coordinates":[[[134.5,-35.5],[135.372222,-34.686667],[137.716667,-32.5],[141.0,-33.65],[141.0,-39.57],[134.5,-35.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-51"},"geometry":{"type":"Polygon","coordinates":[[[135.0,-30.0],[141.0,-29.0],[141.0,-33.65],[137.716667,-32.5],[135.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-52"},"geometry":{"type":"Polygon","coordinates":[[[129.0,-26.0],[138.0,-26.0],[141.0,-26.0],[141.0,-29.0],[135.0,-30.0],[129.0,-30.0],[129.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-53"},"geometry":{"type":"Polygon","coordinates":[[[129.0,-30.0],[135.0,-30.0],[137.716667,-32.5],[135.372222,-34.686667],[134.5,-35.5],[131.0,-32.5],[129.0,-33.0],[129.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-60"},"geometry":{"type":"Polygon","coordinates":[[[112.5,-27.5],[118.0,-27.5],[119.0,-32.25],[113.5,-33.5],[112.5,-27.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-61"},"geometry":{"type":"Polygon","coordinates":[[[119.0,-32.25],[118.0,-27.5],[123.5,-27.5],[123.618333,-30.84],[119.0,-32.25]]]}},{"type":"Feature","properties":{"area_code":"AREA-62"},"geometry":{"type":"Polygon","coordinates":[[[123.618333,-30.84],[129.0,-30.0],[129.0,-33.0],[123.5,-35.0],[123.618333,-30.84]]]}},{"type":"Feature","properties":{"area_code":"AREA-63"},"geometry":{"type":"Polygon","coordinates":[[[113.5,-33.5],[119.0,-32.25],[123.618333,-30.84],[123.5,-35.0],[116.0,-36.25],[113.5,-33.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-64"},"geometry":{"type":"Polygon","coordinates":[[[123.5,-23.88],[129.0,-23.88],[129.0,-30.0],[123.618333,-30.84],[123.5,-27.5],[123.5,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-65"},"geometry":{"type":"Polygon","coordinates":[[[112.096944,-23.88],[115.984722,-23.88],[118.0,-27.5],[112.5,-27.5],[112.096944,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-66"},"geometry":{"type":"Polygon","coordinates":[[[115.984722,-23.88],[123.5,-23.88],[123.5,-27.5],[118.0,-27.5],[115.984722,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-68"},"geometry":{"type":"Polygon","coordinates":[[[112.0,-23.0],[113.0,-21.0],[117.0,-18.0],[120.0,-18.0],[123.5,-20.5],[123.5,-23.88],[115.984722,-23.88],[112.096944,-23.88],[112.0,-23.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-69"},"geometry":{"type":"Polygon","coordinates":[[[117.0,-18.0],[124.0,-14.0],[126.148056,-13.751667],[127.5,-14.0],[128.416667,-14.833333],[129.0,-14.879444],[129.0,-20.0],[123.5,-20.5],[120.0,-18.0],[117.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-70"},"geometry":{"type":"Polygon","coordinates":[[[142.8575,-39.57],[150.2,-39.57],[149.0,-43.0],[147.5,-44.5],[145.0,-44.0],[142.8575,-39.57]]]}},{"type":"Feature","properties":{"area_code":"AREA-80"},"geometry":{"type":"Polygon","coordinates":[[[129.0,-9.409722],[141.0,-9.833333],[138.0,-14.0],[138.0,-19.0],[129.0,-15.884444],[129.0,-14.879444],[129.0,-9.409722]]]}},{"type":"Feature","properties":{"area_code":"AREA-83"},"geometry":{"type":"Polygon","coordinates":[[[123.5,-20.5],[129.0,-20.0],[129.0,-23.88],[123.5,-23.88],[123.5,-20.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-84"},"geometry":{"type":"Polygon","coordinates":[[[129.0,-20.0],[129.0,-15.884444],[138.0,-19.0],[138.0,-23.156111],[129.0,-22.25],[129.0,-20.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-85"},"geometry":{"type":"Polygon","coordinates":[[[129.0,-23.88],[129.0,-22.25],[138.0,-23.156111],[138.0,-26.0],[129.0,-26.0],[129.0,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-86"},"geometry":{"type":"Polygon","coordinates":[[[124.774444,-10.9125],[126.833333,-9.333333],[129.0,-9.409722],[129.0,-14.879444],[128.416667,-14.833333],[127.5,-14.0],[126.148056,-13.751667],[124.0,-14.0],[124.774444,-10.9125]]]}},{"type":"Feature","properties":{"area_code":"AREA-87"},"geometry":{"type":"Polygon","coordinates":[[[112.0,-18.0],[118.0,-15.0],[124.0,-14.0],[117.0,-18.0],[112.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-88"},"geometry":{"type":"Polygon","coordinates":[[[110.0,-19.0],[112.0,-18.0],[117.0,-18.0],[113.0,-21.0],[110.0,-19.0]]]}}]};
+    
+    let areaGeoJSON, areaQnhMap={}, areaSplits={}, navPointMap={}, map;
 
-    const showWarning = (message) => {
-      if (!message) return;
-      warningBox.textContent = message;
-      warningBox.style.display = 'block';
-      setTimeout(() => warningBox.style.display = 'none', 8000);
-    };
-
-    const showSuccess = (message) => {
-      if (!message) return;
-      successBox.textContent = message;
-      successBox.style.display = 'block';
-      setTimeout(() => successBox.style.display = 'none', 5000);
-    };
-
-    const QNH_WORKER_URL = 'https://areaqnh.therealleviticus.workers.dev/';
-    const NAV_INDEX_URL = 'https://airspace.therealleviticus.workers.dev/';
-    const UPLOAD_WORKER_URL = 'https://imageupload.therealleviticus.workers.dev/';
-
-    const AREA_DATA = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"area_code":"AREA-20","name":"QNH_AREA_20","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[148.383333,-32.75],[150.0,-29.0],[154.703056,-28.043611],[155.0,-28.833333],[152.666667,-34.333333],[151.177222,-33.946111],[150.988333,-33.924444],[149.651944,-33.409444],[148.383333,-32.75]]]}},{"type":"Feature","properties":{"area_code":"AREA-21","name":"QNH_AREA_21","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[146.924722,-36.195278],[148.383333,-32.75],[149.651944,-33.409444],[150.988333,-33.924444],[151.177222,-33.946111],[152.666667,-34.333333],[150.870556,-37.881111],[149.976111,-37.503889],[146.924722,-36.195278]]]}},{"type":"Feature","properties":{"area_code":"AREA-22","name":"QNH_AREA_22","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-29.0],[150.0,-29.0],[148.383333,-32.75],[146.924722,-36.195278],[141.0,-33.65],[141.0,-29.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-24","name":"QNH_AREA_24","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[152.666667,-34.333333],[155.0,-28.833333],[163.0,-28.5],[163.0,-31.333333],[152.666667,-34.333333]]]}},{"type":"Feature","properties":{"area_code":"AREA-30","name":"QNH_AREA_30","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-33.65],[146.924722,-36.195278],[149.976111,-37.503889],[150.870556,-37.881111],[150.2,-39.57],[142.8575,-39.57],[141.0,-39.57],[141.0,-33.65]]]}},{"type":"Feature","properties":{"area_code":"AREA-40","name":"QNH_AREA_40","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[147.820833,-23.156111],[152.864444,-23.155833],[154.703056,-28.043611],[150.0,-29.0],[148.183333,-23.566667],[147.820833,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-41","name":"QNH_AREA_41","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[138.0,-26.0],[138.0,-23.156111],[147.820833,-23.156111],[148.183333,-23.566667],[150.0,-29.0],[141.0,-29.0],[141.0,-26.0],[138.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-43","name":"QNH_AREA_43","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[138.0,-23.156111],[138.0,-19.0],[143.533333,-18.3],[147.820833,-23.156111],[138.0,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-44","name":"QNH_AREA_44","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[143.533333,-18.3],[148.0,-18.283333],[152.864444,-23.155833],[147.820833,-23.156111],[143.533333,-18.3]]]}},{"type":"Feature","properties":{"area_code":"AREA-45","name":"QNH_AREA_45","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[141.0,-9.833333],[141.033333,-9.616667],[142.083333,-9.261667],[142.805,-9.323889],[143.875,-9.133333],[144.233333,-9.4],[144.089167,-9.942778],[144.026667,-11.5],[144.072222,-11.725],[144.0,-12.0],[147.607778,-16.995833],[148.0,-18.283333],[143.533333,-18.3],[138.0,-19.0],[138.0,-14.0],[141.0,-9.833333]]]}},{"type":"Feature","properties":{"area_code":"AREA-50","name":"QNH_AREA_50","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[134.5,-35.5],[135.372222,-34.686667],[137.716667,-32.5],[141.0,-33.65],[141.0,-39.57],[134.5,-35.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-51","name":"QNH_AREA_51","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[135.0,-30.0],[141.0,-29.0],[141.0,-33.65],[137.716667,-32.5],[135.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-52","name":"QNH_AREA_52","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-26.0],[138.0,-26.0],[141.0,-26.0],[141.0,-29.0],[135.0,-30.0],[129.0,-30.0],[129.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-53","name":"QNH_AREA_53","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-30.0],[135.0,-30.0],[137.716667,-32.5],[135.372222,-34.686667],[134.5,-35.5],[131.0,-32.5],[129.0,-33.0],[129.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-60","name":"QNH_AREA_60","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.5,-27.5],[118.0,-27.5],[119.0,-32.25],[113.5,-33.5],[112.5,-27.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-61","name":"QNH_AREA_61","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[119.0,-32.25],[118.0,-27.5],[123.5,-27.5],[123.618333,-30.84],[119.0,-32.25]]]}},{"type":"Feature","properties":{"area_code":"AREA-62","name":"QNH_AREA_62","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.618333,-30.84],[129.0,-30.0],[129.0,-33.0],[123.5,-35.0],[123.618333,-30.84]]]}},{"type":"Feature","properties":{"area_code":"AREA-63","name":"QNH_AREA_63","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[113.5,-33.5],[119.0,-32.25],[123.618333,-30.84],[123.5,-35.0],[116.0,-36.25],[113.5,-33.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-64","name":"QNH_AREA_64","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.5,-23.88],[129.0,-23.88],[129.0,-30.0],[123.618333,-30.84],[123.5,-27.5],[123.5,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-65","name":"QNH_AREA_65","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.096944,-23.88],[115.984722,-23.88],[118.0,-27.5],[112.5,-27.5],[112.096944,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-66","name":"QNH_AREA_66","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[115.984722,-23.88],[123.5,-23.88],[123.5,-27.5],[118.0,-27.5],[115.984722,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-68","name":"QNH_AREA_68","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.0,-23.0],[113.0,-21.0],[117.0,-18.0],[120.0,-18.0],[123.5,-20.5],[123.5,-23.88],[115.984722,-23.88],[112.096944,-23.88],[112.0,-23.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-69","name":"QNH_AREA_69","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[117.0,-18.0],[124.0,-14.0],[126.148056,-13.751667],[127.5,-14.0],[128.416667,-14.833333],[129.0,-14.879444],[129.0,-20.0],[123.5,-20.5],[120.0,-18.0],[117.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-70","name":"QNH_AREA_70","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[142.8575,-39.57],[150.2,-39.57],[149.0,-43.0],[147.5,-44.5],[145.0,-44.0],[142.8575,-39.57]]]}},{"type":"Feature","properties":{"area_code":"AREA-80","name":"QNH_AREA_80","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-9.409722],[141.0,-9.833333],[138.0,-14.0],[138.0,-19.0],[129.0,-15.884444],[129.0,-14.879444],[129.0,-9.409722]]]}},{"type":"Feature","properties":{"area_code":"AREA-83","name":"QNH_AREA_83","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[123.5,-20.5],[129.0,-20.0],[129.0,-23.88],[123.5,-23.88],[123.5,-20.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-84","name":"QNH_AREA_84","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-20.0],[129.0,-15.884444],[138.0,-19.0],[138.0,-23.156111],[129.0,-22.25],[129.0,-20.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-85","name":"QNH_AREA_85","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[129.0,-23.88],[129.0,-22.25],[138.0,-23.156111],[138.0,-26.0],[129.0,-26.0],[129.0,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-86","name":"QNH_AREA_86","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[124.774444,-10.9125],[126.833333,-9.333333],[129.0,-9.409722],[129.0,-14.879444],[128.416667,-14.833333],[127.5,-14.0],[126.148056,-13.751667],[124.0,-14.0],[124.774444,-10.9125]]]}},{"type":"Feature","properties":{"area_code":"AREA-87","name":"QNH_AREA_87","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[112.0,-18.0],[118.0,-15.0],[124.0,-14.0],[117.0,-18.0],[112.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-88","name":"QNH_AREA_88","qnh":null},"geometry":{"type":"Polygon","coordinates":[[[110.0,-19.0],[112.0,-18.0],[117.0,-18.0],[113.0,-21.0],[110.0,-19.0]]]}}]};
-
-    const EXPORT_REGIONS = {
-      'AU': { bounds: [[110, -45], [163, -9]], name: 'Australia' },
-      'NE': { bounds: [[138, -30], [163, -9]], name: 'Northeast' },
-      'SE': { bounds: [[138, -45], [163, -30]], name: 'Southeast' },
-      'NW': { bounds: [[110, -30], [138, -9]], name: 'Northwest' },
-      'SW': { bounds: [[110, -45], [138, -30]], name: 'Southwest' }
-    };
-
-    let areaGeoJSON = null;
-    let areaQnhMap = {};
-    let areaSplits = {};
-    let navPointMap = {};
-    let navIndexPromise = null;
-    let map = null;
-    let mapFullyReady = false;
-    let lastIssuedTimestamp = null; // Track last issued timestamp for change detection
-
-    function initializeMap() {
-      try {
-        map = new maplibregl.Map({
-          container: 'map',
-          style: {
-            version: 8,
-            glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
-            sources: {
-              osm: {
-                type: 'raster',
-                tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-                tileSize: 256,
-                attribution: '© OpenStreetMap contributors',
-                crossOrigin: 'anonymous'
-              }
-            },
-            layers: [{ id: 'osm-base', type: 'raster', source: 'osm' }]
+    function getMapStyle() {
+      if (USE_MAPBOX && MAPBOX_TOKEN) {
+        return {
+          version: 8,
+          glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+          sources: {
+            'mapbox-dark': {
+              type: 'raster',
+              tiles: [`https://api.mapbox.com/styles/v1/mapbox/dark-v11/tiles/{z}/{x}/{y}?access_token=${MAPBOX_TOKEN}`],
+              tileSize: 512,
+              attribution: '© <a href="https://www.mapbox.com/">Mapbox</a> © <a href="https://www.openstreetmap.org/">OpenStreetMap</a>'
+            }
           },
-          center: [134.5, -25.5],
-          zoom: 3.6,
-          failIfMajorPerformanceCaveat: false,
-          preserveDrawingBuffer: true
-        });
-
-        map.addControl(new maplibregl.NavigationControl(), 'top-left');
-
-        map.on('error', (e) => {
-          console.error('Map error:', e);
-        });
-
-        map.on('load', async () => {
-          console.log('Map loaded successfully');
-          await loadAreas();
-          await ensureNavIndex();
-          await fetchAndDrawQNH();
-          
-          // Wait for map to be fully idle before marking as ready
-          map.once('idle', () => {
-            console.log('Map fully idle and ready');
-            mapFullyReady = true;
-          });
-          
-          // Start the QNH check loop (checks every minute for changes)
-          startQNHCheckLoop();
-        });
-
-      } catch (error) {
-        console.error('Failed to initialize map:', error);
-        showWarning('Failed to initialize map. Please refresh the page.');
+          layers: [{ id: 'base', type: 'raster', source: 'mapbox-dark' }]
+        };
       }
+      return {
+        version: 8,
+        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
+        sources: {
+          'carto': {
+            type: 'raster',
+            tiles: ['https://a.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+            tileSize: 256,
+            attribution: '© CARTO © OpenStreetMap'
+          }
+        },
+        layers: [{ id: 'base', type: 'raster', source: 'carto' }]
+      };
     }
 
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', initializeMap);
-    } else {
-      initializeMap();
+    function initMap() {
+      map = new maplibregl.Map({
+        container: 'map',
+        style: getMapStyle(),
+        center: [134.5, -25.5],
+        zoom: 4,
+        preserveDrawingBuffer: true
+      });
+      map.addControl(new maplibregl.NavigationControl(), 'top-left');
+      map.on('load', async () => { await loadAreas(); await fetchNav(); await fetchQNH(); setInterval(fetchQNH, 300000); });
     }
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', initMap) : initMap();
 
     async function loadAreas() {
-      const geojson = JSON.parse(JSON.stringify(AREA_DATA));
-      geojson.features.forEach((f, i) => f.id = i + 1);
-      areaGeoJSON = geojson;
+      areaGeoJSON = JSON.parse(JSON.stringify(AREAS));
+      areaGeoJSON.features.forEach((f,i) => f.id = i+1);
+      map.addSource('areas', { type: 'geojson', data: areaGeoJSON });
+      // Only line border, no fill
+      map.addLayer({ id: 'areas-line', type: 'line', source: 'areas', paint: { 'line-color': '#f85149', 'line-width': 2 }});
+      updateLabels();
+    }
 
-      map.addSource('areas', { type: 'geojson', data: geojson });
+    function pointInPoly(pt, ring) { let inside = false; for (let i=0, j=ring.length-1; i<ring.length; j=i++) { const [xi,yi]=ring[i],[xj,yj]=ring[j]; if(((yi>pt[1])!==(yj>pt[1]))&&(pt[0]<(xj-xi)*(pt[1]-yi)/(yj-yi)+xi)) inside=!inside; } return inside; }
+    function distToSeg(pt, a, b) { const dx=b[0]-a[0], dy=b[1]-a[1], l2=dx*dx+dy*dy; if(l2===0) return Math.hypot(pt[0]-a[0],pt[1]-a[1]); let t=Math.max(0,Math.min(1,((pt[0]-a[0])*dx+(pt[1]-a[1])*dy)/l2)); return Math.hypot(pt[0]-(a[0]+t*dx), pt[1]-(a[1]+t*dy)); }
+    function findLabelPos(ring, grid=50) {
+      if(!ring||ring.length<3) return [0,0];
+      let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+      ring.forEach(([x,y]) => { minX=Math.min(minX,x); maxX=Math.max(maxX,x); minY=Math.min(minY,y); maxY=Math.max(maxY,y); });
+      const sx=(maxX-minX)/grid, sy=(maxY-minY)/grid;
+      let best=null, maxD=-Infinity;
+      for(let i=0;i<=grid;i++) for(let j=0;j<=grid;j++) {
+        const pt=[minX+i*sx, minY+j*sy];
+        if(!pointInPoly(pt,ring)) continue;
+        let minDist=Infinity;
+        for(let k=0;k<ring.length-1;k++) minDist=Math.min(minDist, distToSeg(pt,ring[k],ring[k+1]));
+        if(minDist>maxD) { maxD=minDist; best=pt; }
+      }
+      return best || [ring.reduce((s,c)=>s+c[0],0)/(ring.length-1), ring.reduce((s,c)=>s+c[1],0)/(ring.length-1)];
+    }
 
-      map.addLayer({
-        id: 'areas-fill',
-        type: 'fill',
-        source: 'areas',
-        paint: { 'fill-color': '#ffffff', 'fill-opacity': 0.30 }
+    function updateLabels() {
+      const features = areaGeoJSON.features.map(f => {
+        const code = f.properties.area_code, ring = f.geometry.coordinates[0];
+        const splits = areaSplits[code], entry = areaQnhMap[code];
+        f.properties.qnh = splits?.length ? null : (entry?.qnh || null);
+        f.properties.hasSplit = !!splits?.length;
+        return { type: 'Feature', properties: { area_code: code, qnh: f.properties.qnh }, geometry: { type: 'Point', coordinates: findLabelPos(ring) }};
       });
-
-      map.addLayer({
-        id: 'areas-line',
-        type: 'line',
-        source: 'areas',
-        paint: { 'line-color': '#d40000', 'line-width': 2 }
-      });
-
-      createAreaLabels();
-      applyAreaQnhToPolygons();
-      fitToAreas(geojson);
-    }
-
-    function findOptimalLabelPosition(ring, gridSize = 50) {
-      if (!ring || ring.length < 3) return [0, 0];
-
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      ring.forEach(([x, y]) => {
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y);
-      });
-
-      const width = maxX - minX;
-      const height = maxY - minY;
-      const stepX = width / gridSize;
-      const stepY = height / gridSize;
-
-      let bestPoint = null;
-      let maxMinDist = -Infinity;
-
-      for (let i = 0; i <= gridSize; i++) {
-        for (let j = 0; j <= gridSize; j++) {
-          const x = minX + i * stepX;
-          const y = minY + j * stepY;
-          const point = [x, y];
-
-          if (!pointInPolygon(point, ring)) continue;
-
-          let minDistToBoundary = Infinity;
-          for (let k = 0; k < ring.length - 1; k++) {
-            const dist = distanceToSegment(point, ring[k], ring[k + 1]);
-            minDistToBoundary = Math.min(minDistToBoundary, dist);
-          }
-
-          if (minDistToBoundary > maxMinDist) {
-            maxMinDist = minDistToBoundary;
-            bestPoint = point;
-          }
-        }
+      const fc = { type: 'FeatureCollection', features };
+      if(map.getSource('labels')) map.getSource('labels').setData(fc);
+      else {
+        map.addSource('labels', { type: 'geojson', data: fc });
+        // White text for area labels and QNH
+        map.addLayer({ id: 'labels', type: 'symbol', source: 'labels', layout: { 'text-field': ['format', ['to-string', ['coalesce', ['get', 'qnh'], '']], { 'font-scale': 1 }, '\n', ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]], { 'font-scale': 0.7 }], 'text-font': ['Noto Sans Regular'], 'text-size': 16, 'text-allow-overlap': true, 'text-ignore-placement': true }, paint: { 'text-color': '#ffffff', 'text-halo-color': '#000000', 'text-halo-width': 2 }});
       }
-
-      if (!bestPoint) {
-        return calculatePolygonCentroid(ring);
-      }
-
-      return bestPoint;
+      map.getSource('areas')?.setData(areaGeoJSON);
     }
 
-    function calculatePolygonCentroid(ring) {
-      if (!ring || ring.length < 3) return [0, 0];
-      let sumX = 0, sumY = 0;
-      const count = ring.length - 1;
-      for (let i = 0; i < count; i++) {
-        sumX += ring[i][0];
-        sumY += ring[i][1];
-      }
-      return [sumX / count, sumY / count];
-    }
-
-    function createAreaLabels() {
-      if (!areaGeoJSON?.features) return;
-
-      const labelFeatures = areaGeoJSON.features.map(feature => {
-        const props = feature.properties;
-        const areaCode = props?.area_code;
-        const coords = feature.geometry?.coordinates?.[0];
-        
-        let labelCoord = coords && coords.length > 0 
-          ? findOptimalLabelPosition(coords)
-          : [0, 0];
-
-        if (coords && !pointInPolygon(labelCoord, coords)) {
-          labelCoord = calculatePolygonCentroid(coords);
-        }
-
-        return {
-          type: 'Feature',
-          properties: {
-            area_code: areaCode,
-            qnh: props.qnh,
-            hasSplit: props.hasSplit,
-            splitCount: props.splitCount
-          },
-          geometry: { type: 'Point', coordinates: labelCoord }
-        };
-      });
-
-      const labelFC = { type: 'FeatureCollection', features: labelFeatures };
-
-      if (map.getSource('area-labels')) {
-        map.getSource('area-labels').setData(labelFC);
-      } else {
-        map.addSource('area-labels', { type: 'geojson', data: labelFC });
-        map.addLayer({
-          id: 'areas-label',
-          type: 'symbol',
-          source: 'area-labels',
-          layout: {
-            'text-field': [
-              'format',
-              ['to-string', ['coalesce', ['get', 'qnh'], '']],
-              { 'font-scale': 1.0 },
-              '\n',
-              ['concat', 'AREA ', ['slice', ['get', 'area_code'], 5]],
-              { 'font-scale': 0.7, 'text-color': '#c40000' }
-            ],
-            'text-font': ['Noto Sans Regular'],
-            'text-size': 18,
-            'text-allow-overlap': true,
-            'text-ignore-placement': true,
-            'symbol-z-order': 'source'
-          },
-          paint: {
-            'text-halo-color': '#fff',
-            'text-halo-width': 1.2
-          }
-        });
-      }
-    }
-
-    function applyAreaQnhToPolygons() {
-      if (!areaGeoJSON?.features) return;
-
-      areaGeoJSON.features.forEach((feature) => {
-        const code = (feature.properties?.area_code || '').toUpperCase();
-        const entry = areaQnhMap[code];
-        const splits = areaSplits[code];
-
-        if (splits?.length) {
-          feature.properties.qnh = null;
-          feature.properties.hasSplit = true;
-          feature.properties.splitCount = splits.length;
-        } else {
-          feature.properties.qnh = entry ? entry.qnh : null;
-          feature.properties.hasSplit = false;
-          feature.properties.splitCount = 0;
-        }
-      });
-
-      const source = map.getSource('areas');
-      if (source?.setData) {
-        source.setData(areaGeoJSON);
-      }
-
-      createAreaLabels();
-    }
-
-    function fitToAreas(geojson) {
-      const features = geojson?.features;
-      if (!features?.length || !map?.fitBounds) return;
-
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-      const processCoord = (coord) => {
-        if (!Array.isArray(coord) || coord.length < 2) return;
-        const [x, y] = coord;
-        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y);
-      };
-
-      const walk = (coords) => {
-        if (!Array.isArray(coords)) return;
-        if (typeof coords[0] === 'number') {
-          processCoord(coords);
-          return;
-        }
-        coords.forEach(walk);
-      };
-
-      features.forEach(f => walk(f.geometry?.coordinates));
-      
-      if (!Number.isFinite(minX) || !Number.isFinite(maxX)) return;
-
-      const bounds = new maplibregl.LngLatBounds([minX, minY], [maxX, maxY]);
-      map.fitBounds(bounds, { padding: 24, maxZoom: 6, duration: 400 });
-    }
-
-    async function fetchWithTimeout(url, options = {}, timeout = 30000) {
-      if (typeof AbortController !== 'undefined') {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-        try {
-          const response = await fetch(url, { ...options, signal: controller.signal });
-          clearTimeout(timeoutId);
-          return response;
-        } catch (error) {
-          clearTimeout(timeoutId);
-          if (error.name === 'AbortError') {
-            throw new Error('Request timeout');
-          }
-          throw error;
-        }
-      } else {
-        return new Promise((resolve, reject) => {
-          const timeoutId = setTimeout(() => reject(new Error('Request timeout')), timeout);
-          fetch(url, options)
-            .then(response => { clearTimeout(timeoutId); resolve(response); })
-            .catch(error => { clearTimeout(timeoutId); reject(error); });
-        });
-      }
-    }
-
-    // Check for QNH updates every minute
-    function startQNHCheckLoop() {
-      setInterval(checkForQNHUpdate, 60 * 1000); // Check every minute
-    }
-
-    async function checkForQNHUpdate() {
+    async function fetchNav() {
       try {
-        const res = await fetchWithTimeout(QNH_WORKER_URL + '?t=' + Date.now(), { cache: 'no-store' }, 30000);
-        if (!res.ok) return;
-        const raw = await res.text();
-        const text = sanitizeHTML(raw);
-        const parsed = parseQNHText(text);
-        
-        const newIssued = parsed.validIssued?.issued;
-        
-        if (newIssued && newIssued !== lastIssuedTimestamp) {
-          console.log(`QNH data changed! Old: ${lastIssuedTimestamp}, New: ${newIssued}`);
-          lastIssuedTimestamp = newIssued;
-          
-          // Update the map
-          areaQnhMap = parsed.areaQnhMap;
-          areaSplits = parsed.areaSplits;
-          applyAreaQnhToPolygons();
-          drawSplitLines();
-          
-          updateValidityDisplay(parsed);
-          showSuccess('New QNH data detected and loaded!');
-          
-          // Auto-export to R2 when data changes
-          if (mapFullyReady) {
-            setTimeout(() => autoExportAllToR2(), 2000);
-          }
-        }
-      } catch (err) {
-        console.error('QNH check failed:', err);
-      }
+        const res = await fetch(NAV_URL+'?t='+Date.now()); if(!res.ok) return;
+        const doc = new DOMParser().parseFromString(await res.text(), 'application/xml');
+        doc.querySelectorAll('Point[Name]').forEach(n => { const c=parseCoord(n.textContent); if(c) navPointMap[n.getAttribute('Name').toUpperCase()]=c; });
+        doc.querySelectorAll('Airport').forEach(n => { const c=parseCoord(n.getAttribute('Position')||n.textContent); if(c) ['ICAO','Name','FullName'].forEach(a => { const v=n.getAttribute(a); if(v) navPointMap[v.toUpperCase()]=c; }); });
+      } catch(e) { console.error(e); }
     }
+    function parseCoord(raw) { if(!raw) return null; const p=raw.split(/(?=[+-]\d)/).filter(Boolean); if(p.length!==2) return null; const lat=dms(p[0]), lon=dms(p[1]); return (isFinite(lat)&&isFinite(lon))?[lon,lat]:null; }
+    function dms(s) { if(!s) return NaN; const sign=s.trim().startsWith('-')?-1:1, n=Math.abs(parseFloat(s)), d=Math.floor(n/10000), r=n-d*10000, m=Math.floor(r/100); return sign*(d+m/60+(r-m*100)/3600); }
 
-    async function fetchAndDrawQNH() {
-      const validityBox = document.getElementById('validity');
+    async function fetchQNH() {
+      $('statusDot').className = 'status-dot loading'; $('validityText').textContent = 'Fetching...';
       try {
-        validityBox.textContent = 'Fetching QNH data...';
-
-        const res = await fetchWithTimeout(QNH_WORKER_URL + '?t=' + Date.now(), { cache: 'no-store' }, 30000);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const raw = await res.text();
-
-        const text = sanitizeHTML(raw);
-        const parsed = parseQNHText(text);
-        
-        areaQnhMap = parsed.areaQnhMap;
-        areaSplits = parsed.areaSplits;
-        lastIssuedTimestamp = parsed.validIssued?.issued || null;
-        
-        applyAreaQnhToPolygons();
-        drawSplitLines();
-
-        updateValidityDisplay(parsed);
-        showSuccess(`QNH data loaded successfully`);
-
-      } catch (err) {
-        console.error('Failed to fetch/parse QNH:', err);
-        validityBox.textContent = 'Failed to fetch QNH data';
-        showWarning('QNH fetch failed - latest values unavailable.');
-      }
+        const res = await fetch(QNH_URL+'?t='+Date.now()); if(!res.ok) throw new Error('HTTP '+res.status);
+        const text = (await res.text()).replace(/<[^>]+>/g,' ').replace(/&\w+;/g,' ').trim();
+        const parsed = parseQNH(text);
+        areaQnhMap = parsed.qnhMap; areaSplits = parsed.splits;
+        updateLabels(); drawSplits();
+        const v = parsed.validity;
+        $('validityText').textContent = v ? `Valid: ${v.valid} | Issued: ${v.issued}` : 'Data loaded';
+        showSuccess(`Loaded ${Object.keys(parsed.qnhMap).length} areas`);
+      } catch(e) { console.error(e); $('validityText').textContent = 'Failed'; showWarning('Failed to fetch QNH data'); }
     }
 
-    function updateValidityDisplay(parsed) {
-      const validityBox = document.getElementById('validity');
-      const v = parsed.validIssued;
-      const areaCount = Object.keys(parsed.areaQnhMap || {}).length;
-      const totalAreas = areaGeoJSON?.features?.length || '?';
-      const splitCount = Object.keys(parsed.areaSplits || {}).length;
-      
-      validityBox.textContent = v
-        ? `Valid: ${v.valid} | Issued: ${v.issued} | Areas: ${areaCount}/${totalAreas}${splitCount ? ` (${splitCount} split)` : ''}`
-        : `Areas: ${areaCount}/${totalAreas}${splitCount ? ` (${splitCount} split)` : ''}`;
-    }
-
-    function sanitizeHTML(html) {
-      return html
-        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-        .replace(/<br\s*\/?>/gi, '\n')
-        .replace(/<\/(p|div|li|h\d|section)>/gi, '\n')
-        .replace(/<[^>]+>/g, ' ')
-        .replace(/&nbsp;/g, ' ')
-        .replace(/&amp;/g, '&')
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/[ \t]+\n/g, '\n')
-        .replace(/\n[ \t]+/g, '\n')
-        .replace(/\n{3,}/g, '\n\n')
-        .trim();
-    }
-
-    function parseQNHText(text) {
-      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
-      const blocks = [];
-      let current = null;
-
-      for (const line of lines) {
+    function parseQNH(text) {
+      const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean), blocks = [];
+      let cur = null;
+      for(const line of lines) {
         const m = line.match(/^(?:AREA|Area)\s*(\d+)\s*:(.*)$/);
-        if (m) {
-          if (current) blocks.push(current);
-          current = { area: `AREA-${m[1]}`, lines: [] };
-          const rest = m[2]?.trim();
-          if (rest) current.lines.push(rest);
-          continue;
-        }
-        if (/^Valid:/i.test(line) && current) {
-          blocks.push(current);
-          current = null;
-          continue;
-        }
-        if (current) current.lines.push(line);
+        if(m) { if(cur) blocks.push(cur); cur = { area: `AREA-${m[1]}`, lines: [] }; if(m[2].trim()) cur.lines.push(m[2].trim()); continue; }
+        if(/^Valid:/i.test(line) && cur) { blocks.push(cur); cur = null; continue; }
+        if(cur) cur.lines.push(line);
       }
-      if (current) blocks.push(current);
-
-      const areaQnhMapLocal = {};
-      const areaSplitsLocal = {};
-
-      for (const b of blocks) {
-        const txt = b.lines.join(' ');
-        const matches = [...txt.matchAll(/\b(\d{4})\b/g)].map(m => Number(m[1]));
-        const qnh = matches.find(n => n >= 900 && n <= 1050) ?? null;
-        if (qnh) areaQnhMapLocal[b.area] = { qnh };
-
+      if(cur) blocks.push(cur);
+      const qnhMap = {}, splits = {};
+      for(const b of blocks) {
+        const txt = b.lines.join(' '), nums = [...txt.matchAll(/\b(\d{4})\b/g)].map(m=>+m[1]);
+        const qnh = nums.find(n=>n>=900&&n<=1050);
+        if(qnh) qnhMap[b.area] = { qnh };
         const rules = [];
-
-        const betweenRegex = /BETWEEN\s+([^,]+?)\s+AND\s+([^,]+?)\s+(\d{4})(?=[^\d]|$)/gi;
-        let match;
-        while ((match = betweenRegex.exec(txt)) !== null) {
-          rules.push({
-            type: 'between',
-            lhs: match[1].replace(/[.,;]+$/g, '').trim(),
-            rhs: match[2].replace(/[.,;]+$/g, '').trim(),
-            qnh: Number(match[3])
-          });
-        }
-
-        const ofRegex = /\b(NW|NE|SW|SE|N|S|E|W)\s+OF\s+([^,]+?)\s+(\d{4})(?=[^\d]|$)/gi;
-        while ((match = ofRegex.exec(txt)) !== null) {
-          rules.push({
-            type: 'of',
-            dir: match[1].toUpperCase(),
-            lhs: match[2].replace(/[.,;]+$/g, '').trim(),
-            qnh: Number(match[3])
-          });
-        }
-
-        const restRegex = /\bREST\s+(\d{4})(?=[^\d]|$)/gi;
-        while ((match = restRegex.exec(txt)) !== null) {
-          rules.push({
-            type: 'rest',
-            qnh: Number(match[1])
-          });
-        }
-
-        if (rules.length) {
-          areaSplitsLocal[b.area] = rules;
-        }
+        let m;
+        const betweenRx = /BETWEEN\s+([^,]+?)\s+AND\s+([^,]+?)\s+(\d{4})(?=[^\d]|$)/gi;
+        while((m=betweenRx.exec(txt))) rules.push({ type:'between', lhs:m[1].trim(), rhs:m[2].trim(), qnh:+m[3] });
+        const ofRx = /\b(NW|NE|SW|SE|N|S|E|W)\s+OF\s+([^,]+?)\s+(\d{4})(?=[^\d]|$)/gi;
+        while((m=ofRx.exec(txt))) rules.push({ type:'of', dir:m[1].toUpperCase(), lhs:m[2].trim(), qnh:+m[3] });
+        const restRx = /\bREST\s+(\d{4})(?=[^\d]|$)/gi;
+        while((m=restRx.exec(txt))) rules.push({ type:'rest', qnh:+m[1] });
+        if(rules.length) splits[b.area] = rules;
       }
-
-      const validAll = [...text.matchAll(/Valid:\s*([^\n]*?)(?=Issued:|\n|$)/gi)];
-      const issuedAll = [...text.matchAll(/Issued:\s*([^\n]*)/gi)];
-      const validIssued = (validAll.length && issuedAll.length)
-        ? { valid: validAll.at(-1)[1].trim(), issued: issuedAll.at(-1)[1].trim() }
-        : null;
-
-      return { areaQnhMap: areaQnhMapLocal, areaSplits: areaSplitsLocal, validIssued };
+      const validM = [...text.matchAll(/Valid:\s*([^\n]*?)(?=Issued:|\n|$)/gi)], issueM = [...text.matchAll(/Issued:\s*([^\n]*)/gi)];
+      const validity = (validM.length&&issueM.length) ? { valid: validM.at(-1)[1].trim(), issued: issueM.at(-1)[1].trim() } : null;
+      return { qnhMap, splits, validity };
     }
 
-    function ensureNavIndex() {
-      if (!navIndexPromise) navIndexPromise = fetchNavIndex();
-      return navIndexPromise;
-    }
-
-    async function fetchNavIndex() {
-      try {
-        const res = await fetchWithTimeout(NAV_INDEX_URL + '?t=' + Date.now(), { cache: 'no-store' }, 30000);
-        if (!res.ok) throw new Error(`Nav index HTTP ${res.status}`);
-        const xmlText = await res.text();
-        const doc = new DOMParser().parseFromString(xmlText, 'application/xml');
-        navPointMap = {};
-
-        const points = doc.querySelectorAll('Point[Name]');
-        points.forEach((node) => {
-          const name = node.getAttribute('Name');
-          const raw = node.textContent?.trim();
-          const coord = parseAirspacePoint(raw);
-          if (name && coord) navPointMap[name.toUpperCase()] = coord;
-        });
-
-        const airports = doc.querySelectorAll('Airport[ICAO], Airport[Name], Airport[FullName], Airport[Position]');
-        airports.forEach((node) => {
-          const pos = node.getAttribute('Position') || node.textContent?.trim();
-          const coord = parseAirspacePoint(pos);
-          if (!coord) return;
-          
-          const icao = node.getAttribute('ICAO');
-          const name = node.getAttribute('Name');
-          const full = node.getAttribute('FullName');
-          [icao, name, full].forEach(alias => {
-            if (alias) navPointMap[alias.toUpperCase()] = coord;
-          });
-        });
-
-        console.log(`Loaded ${Object.keys(navPointMap).length} navigation points`);
-        return navPointMap;
-      } catch (err) {
-        console.error('Failed to load nav index:', err);
-        showWarning('Could not load navigation index.');
-        return navPointMap;
-      }
-    }
-
-    function parseAirspacePoint(raw) {
-      if (!raw) return null;
-      const parts = raw.split(/(?=[+-]\d)/).filter(Boolean);
-      if (parts.length !== 2) return null;
-      const lat = dmsStringToDecimal(parts[0]);
-      const lon = dmsStringToDecimal(parts[1]);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-      return [lon, lat];
-    }
-
-    function dmsStringToDecimal(valStr) {
-      if (!valStr) return NaN;
-      const sign = valStr.trim().startsWith('-') ? -1 : 1;
-      const num = Math.abs(parseFloat(valStr));
-      const deg = Math.floor(num / 10000);
-      const rem = num - deg * 10000;
-      const min = Math.floor(rem / 100);
-      const sec = rem - min * 100;
-      return sign * (deg + min / 60 + sec / 3600);
-    }
-
-    function resolveTokenToCoord(token) {
-      if (!token) return null;
-      const trimmed = token.trim();
-      
-      const patterns = [
-        /^(\d{1,2})([NS])(\d{1,3})([EW])$/i,
-        /^(\d{1,2})(\d{2})([NS])(\d{1,3})(\d{2})([EW])$/i
-      ];
-      
-      for (const pattern of patterns) {
-        const m = trimmed.match(pattern);
-        if (m) {
+    function resolveToken(tok) {
+      if(!tok) return null;
+      const t = tok.trim();
+      const pats = [/^(\d{1,2})([NS])(\d{1,3})([EW])$/i, /^(\d{1,2})(\d{2})([NS])(\d{1,3})(\d{2})([EW])$/i];
+      for(const p of pats) {
+        const m = t.match(p);
+        if(m) {
           const hasMin = m.length > 5;
-          const latDeg = Number(m[1]);
-          const latMin = hasMin ? Number(m[2]) : 0;
-          const lonDeg = hasMin ? Number(m[4]) : Number(m[3]);
-          const lonMin = hasMin ? Number(m[5]) : 0;
-          const latDir = hasMin ? m[3] : m[2];
-          const lonDir = hasMin ? m[6] : m[4];
-          
-          const lat = (latDir.toUpperCase() === 'S' ? -1 : 1) * (latDeg + latMin / 60);
-          const lon = (lonDir.toUpperCase() === 'W' ? -1 : 1) * (lonDeg + lonMin / 60);
-          return { coord: [lon, lat], name: trimmed.toUpperCase() };
+          const lat = (m[hasMin?3:2].toUpperCase()==='S'?-1:1) * (+m[1] + (hasMin?+m[2]:0)/60);
+          const lon = (m[hasMin?6:4].toUpperCase()==='W'?-1:1) * (+m[hasMin?4:3] + (hasMin?+m[5]:0)/60);
+          return { coord: [lon, lat], name: t.toUpperCase() };
         }
       }
-      
-      const lookup = navPointMap[trimmed.toUpperCase()];
-      return lookup ? { coord: lookup, name: trimmed.toUpperCase() } : null;
+      const c = navPointMap[t.toUpperCase()];
+      return c ? { coord: c, name: t.toUpperCase() } : null;
     }
+    function tokenize(s) { const skip = new Set(['N','S','E','W','NE','NW','SE','SW','OF','TO','FROM']); return s.split(/[\s\/]+/).map(t=>t.replace(/[.,;]+$/,'').trim()).filter(t=>t&&!skip.has(t.toUpperCase())); }
 
-    function tokenizeSplitSide(sideText) {
-      const skip = new Set(['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW', 'OF', 'TO', 'FROM']);
-      return sideText
-        .split(/[\/\s]+/)
-        .map(t => t.replace(/[.,;]+$/g, '').trim())
-        .filter(t => t && !skip.has(t.toUpperCase()));
+    function signedDist(pt, a, b) { return (b[0]-a[0])*(pt[1]-a[1]) - (b[1]-a[1])*(pt[0]-a[0]); }
+    function onCompassSide(pt, line, dir) {
+      if(!line||line.length<2) return false;
+      const [a, b] = [line[0], line[line.length-1]], sd = signedDist(pt, a, b);
+      const dx=b[0]-a[0], dy=b[1]-a[1], len=Math.hypot(dx,dy); if(len===0) return false;
+      const [nx, ny] = [dx/len, dy/len], [lx, ly] = [-ny, nx];
+      const cv = { N:[0,1], S:[0,-1], E:[1,0], W:[-1,0], NE:[.707,.707], NW:[-.707,.707], SE:[.707,-.707], SW:[-.707,-.707] }[dir];
+      if(!cv) return false;
+      const dot = lx*cv[0] + ly*cv[1];
+      if(dot > 0.1) return sd > 0;
+      if(dot < -0.1) return sd < 0;
+      const [cx, cy] = [(a[0]+b[0])/2, (a[1]+b[1])/2], [dLon, dLat] = [pt[0]-cx, pt[1]-cy];
+      switch(dir) { case 'N': return dLat>0; case 'S': return dLat<0; case 'E': return dLon>0; case 'W': return dLon<0; case 'NE': return dLat>0&&dLon>0; case 'NW': return dLat>0&&dLon<0; case 'SE': return dLat<0&&dLon>0; case 'SW': return dLat<0&&dLon<0; }
+      return false;
     }
-
-    // ============================================================
-    // CORE GEOMETRY FUNCTIONS
-    // ============================================================
-
-    function pointInPolygon(point, ring) {
-      const [x, y] = point;
-      let inside = false;
-      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-        const [xi, yi] = ring[i];
-        const [xj, yj] = ring[j];
-        const intersect = ((yi > y) !== (yj > y)) &&
-          (x < (xj - xi) * (y - yi) / (yj - yi) + xi);
-        if (intersect) inside = !inside;
-      }
-      return inside;
+    function between(pt, l1, l2) {
+      if(!l1||l1.length<2||!l2||l2.length<2) return false;
+      const d1=signedDist(pt,l1[0],l1[l1.length-1]), d2=signedDist(pt,l2[0],l2[l2.length-1]);
+      if(Math.abs(d1)<0.01||Math.abs(d2)<0.01) return true;
+      return (d1>0&&d2<0)||(d1<0&&d2>0);
     }
-
-    function distanceToSegment(point, segStart, segEnd) {
-      const [px, py] = point;
-      const [x1, y1] = segStart;
-      const [x2, y2] = segEnd;
-
-      const dx = x2 - x1;
-      const dy = y2 - y1;
-      const lengthSquared = dx * dx + dy * dy;
-
-      if (lengthSquared === 0) {
-        return Math.hypot(px - x1, py - y1);
-      }
-
-      let t = ((px - x1) * dx + (py - y1) * dy) / lengthSquared;
-      t = Math.max(0, Math.min(1, t));
-
-      const closestX = x1 + t * dx;
-      const closestY = y1 + t * dy;
-
-      return Math.hypot(px - closestX, py - closestY);
+    function samplePts(ring, n=100) {
+      if(!ring||ring.length<3) return [];
+      let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+      ring.forEach(([x,y])=>{minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);});
+      const sx=(maxX-minX)/n, sy=(maxY-minY)/n, pts=[];
+      for(let i=0;i<=n;i++) for(let j=0;j<=n;j++) { const p=[minX+i*sx,minY+j*sy]; if(pointInPoly(p,ring)) pts.push(p); }
+      return pts;
     }
-
-    function signedDistanceToLine(point, lineStart, lineEnd) {
-      const dx = lineEnd[0] - lineStart[0];
-      const dy = lineEnd[1] - lineStart[1];
-      const cross = dx * (point[1] - lineStart[1]) - dy * (point[0] - lineStart[0]);
-      return cross;
+    function centroid(pts) { if(!pts.length) return [0,0]; let sx=0,sy=0; pts.forEach(([x,y])=>{sx+=x;sy+=y;}); return [sx/pts.length,sy/pts.length]; }
+    function lineInt(a,b,c,d) {
+      const [x1,y1,x2,y2,x3,y3,x4,y4]=[a[0],a[1],b[0],b[1],c[0],c[1],d[0],d[1]];
+      const den=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4); if(Math.abs(den)<1e-10) return null;
+      const t=((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/den, u=-((x1-x2)*(y1-y3)-(y1-y2)*(x1-x3))/den;
+      return (t>=0&&t<=1&&u>=0&&u<=1) ? [x1+t*(x2-x1),y1+t*(y2-y1)] : null;
     }
-
-    function isPointOnCompassSideOfLine(point, lineCoords, direction) {
-      if (!lineCoords || lineCoords.length < 2) return false;
-
-      const dir = direction.toUpperCase();
-      const lineStart = lineCoords[0];
-      const lineEnd = lineCoords[lineCoords.length - 1];
-      
-      const signedDist = signedDistanceToLine(point, lineStart, lineEnd);
-      
-      const dx = lineEnd[0] - lineStart[0];
-      const dy = lineEnd[1] - lineStart[1];
-      const len = Math.hypot(dx, dy);
-      
-      if (len === 0) return false;
-      
-      const ndx = dx / len;
-      const ndy = dy / len;
-      
-      const leftPerpX = -ndy;
-      const leftPerpY = ndx;
-      
-      const compassVectors = {
-        'N': [0, 1],
-        'S': [0, -1],
-        'E': [1, 0],
-        'W': [-1, 0],
-        'NE': [0.7071, 0.7071],
-        'NW': [-0.7071, 0.7071],
-        'SE': [0.7071, -0.7071],
-        'SW': [-0.7071, -0.7071]
-      };
-      
-      const compassVec = compassVectors[dir];
-      if (!compassVec) return false;
-      
-      const dotWithLeft = leftPerpX * compassVec[0] + leftPerpY * compassVec[1];
-      
-      if (dotWithLeft > 0.1) {
-        return signedDist > 0;
-      } else if (dotWithLeft < -0.1) {
-        return signedDist < 0;
-      } else {
-        const lineCenterLon = (lineStart[0] + lineEnd[0]) / 2;
-        const lineCenterLat = (lineStart[1] + lineEnd[1]) / 2;
-        
-        const dLon = point[0] - lineCenterLon;
-        const dLat = point[1] - lineCenterLat;
-        
-        switch (dir) {
-          case 'N': return dLat > 0;
-          case 'S': return dLat < 0;
-          case 'E': return dLon > 0;
-          case 'W': return dLon < 0;
-          case 'NE': return dLat > 0 && dLon > 0;
-          case 'NW': return dLat > 0 && dLon < 0;
-          case 'SE': return dLat < 0 && dLon > 0;
-          case 'SW': return dLat < 0 && dLon < 0;
-          default: return false;
+    function extendToBnd(pt, dir, ring) {
+      const far=[pt[0]+dir[0]*1000, pt[1]+dir[1]*1000];
+      let best=null, minD=Infinity;
+      for(let i=0;i<ring.length-1;i++) { const h=lineInt(pt,far,ring[i],ring[i+1]); if(h) { const d=Math.hypot(h[0]-pt[0],h[1]-pt[1]); if(d>0.0001&&d<minD){minD=d;best=h;} }}
+      return best;
+    }
+    function extendLine(coords, ring) {
+      if(!coords||coords.length<2) return coords;
+      const fd=[coords[0][0]-coords[1][0], coords[0][1]-coords[1][1]], fl=Math.hypot(...fd), fn=fl>0?[fd[0]/fl,fd[1]/fl]:[0,0];
+      const sb=extendToBnd(coords[0],fn,ring);
+      const li=coords.length-1, ld=[coords[li][0]-coords[li-1][0], coords[li][1]-coords[li-1][1]], ll=Math.hypot(...ld), ln=ll>0?[ld[0]/ll,ld[1]/ll]:[0,0];
+      const eb=extendToBnd(coords[li],ln,ring);
+      return [...(sb?[sb]:[]),...coords,...(eb?[eb]:[])];
+    }
+    function clipLine(coords, ring) {
+      const solid=[], dashed=[];
+      for(let i=0;i<coords.length-1;i++) {
+        const [p1,p2]=[coords[i],coords[i+1]], [i1,i2]=[pointInPoly(p1,ring),pointInPoly(p2,ring)];
+        if(i1&&i2) { solid.push([p1,p2]); continue; }
+        if(!i1&&!i2) {
+          const cr=[]; for(let j=0;j<ring.length-1;j++){const h=lineInt(p1,p2,ring[j],ring[j+1]);if(h)cr.push({pt:h,d:Math.hypot(h[0]-p1[0],h[1]-p1[1])});}
+          if(cr.length>=2){cr.sort((a,b)=>a.d-b.d);dashed.push([p1,cr[0].pt]);solid.push([cr[0].pt,cr[1].pt]);dashed.push([cr[1].pt,p2]);}else{dashed.push([p1,p2]);}
+          continue;
         }
+        let cr=null; for(let j=0;j<ring.length-1;j++){const h=lineInt(p1,p2,ring[j],ring[j+1]);if(h){cr=h;break;}}
+        if(cr){if(i1){solid.push([p1,cr]);dashed.push([cr,p2]);}else{dashed.push([p1,cr]);solid.push([cr,p2]);}}else{(i1||i2)?solid.push([p1,p2]):dashed.push([p1,p2]);}
       }
+      return {solid,dashed};
     }
 
-    function isPointBetweenLines(point, line1Coords, line2Coords) {
-      if (!line1Coords || line1Coords.length < 2) return false;
-      if (!line2Coords || line2Coords.length < 2) return false;
-      
-      const dist1 = signedDistanceToLine(point, line1Coords[0], line1Coords[line1Coords.length - 1]);
-      const dist2 = signedDistanceToLine(point, line2Coords[0], line2Coords[line2Coords.length - 1]);
-      
-      const threshold = 0.01;
-      
-      if (Math.abs(dist1) < threshold || Math.abs(dist2) < threshold) {
-        return true;
-      }
-      
-      return (dist1 > 0 && dist2 < 0) || (dist1 < 0 && dist2 > 0);
-    }
+    function drawSplits() {
+      const solidF=[], dashF=[], ptF=[], lblF=[], seen=new Set();
+      const addPt = (a,p) => { const k=`${a}|${p.name}`; if(seen.has(k)) return; seen.add(k); ptF.push({type:'Feature',properties:{name:p.name},geometry:{type:'Point',coordinates:p.coord}}); };
+      const buildCoords = s => tokenize(s).map(resolveToken).filter(Boolean);
+      const getRing = c => areaGeoJSON.features.find(f=>f.properties.area_code.toUpperCase()===c.toUpperCase())?.geometry.coordinates[0];
 
-    function generateSamplePoints(ring, gridSize = 100) {
-      if (!ring || ring.length < 3) return [];
-
-      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      ring.forEach(([x, y]) => {
-        minX = Math.min(minX, x);
-        maxX = Math.max(maxX, x);
-        minY = Math.min(minY, y);
-        maxY = Math.max(maxY, y);
-      });
-
-      const width = maxX - minX;
-      const height = maxY - minY;
-      const stepX = width / gridSize;
-      const stepY = height / gridSize;
-
-      const points = [];
-      for (let i = 0; i <= gridSize; i++) {
-        for (let j = 0; j <= gridSize; j++) {
-          const x = minX + i * stepX;
-          const y = minY + j * stepY;
-          const point = [x, y];
-
-          if (pointInPolygon(point, ring)) {
-            points.push(point);
+      Object.entries(areaSplits).forEach(([code, rules]) => {
+        const ring = getRing(code); if(!ring) return;
+        const ruleData = rules.map((r,i) => {
+          const d = {rule:r, idx:i, lhs:null, rhs:null};
+          if(r.type==='between') {
+            const lp=buildCoords(r.lhs), rp=buildCoords(r.rhs);
+            lp.forEach(p=>addPt(code,p)); rp.forEach(p=>addPt(code,p));
+            if(lp.length>=2){d.lhs=extendLine(lp.map(p=>p.coord),ring); const{solid,dashed}=clipLine(d.lhs,ring); solid.forEach(s=>solidF.push({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:s}})); dashed.forEach(s=>dashF.push({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:s}}));}
+            if(rp.length>=2){d.rhs=extendLine(rp.map(p=>p.coord),ring); const{solid,dashed}=clipLine(d.rhs,ring); solid.forEach(s=>solidF.push({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:s}})); dashed.forEach(s=>dashF.push({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:s}}));}
           }
-        }
-      }
-
-      return points;
-    }
-
-    function calculateCentroidOfPoints(points) {
-      if (!points || points.length === 0) return [0, 0];
-      let sumX = 0, sumY = 0;
-      points.forEach(([x, y]) => {
-        sumX += x;
-        sumY += y;
-      });
-      return [sumX / points.length, sumY / points.length];
-    }
-
-    function lineIntersection(p1, p2, p3, p4) {
-      const x1 = p1[0], y1 = p1[1];
-      const x2 = p2[0], y2 = p2[1];
-      const x3 = p3[0], y3 = p3[1];
-      const x4 = p4[0], y4 = p4[1];
-      
-      const denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-      if (Math.abs(denom) < 1e-10) return null;
-      
-      const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / denom;
-      const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / denom;
-      
-      if (t >= 0 && t <= 1 && u >= 0 && u <= 1) {
-        return [x1 + t * (x2 - x1), y1 + t * (y2 - y1)];
-      }
-      
-      return null;
-    }
-
-    function extendToBoundary(point, direction, ring) {
-      if (!ring || !point || !direction) return null;
-      
-      const far = [
-        point[0] + direction[0] * 1000,
-        point[1] + direction[1] * 1000
-      ];
-      
-      let closest = null;
-      let minDist = Infinity;
-      
-      for (let i = 0; i < ring.length - 1; i++) {
-        const a = ring[i];
-        const b = ring[i + 1];
-        const hit = lineIntersection(point, far, a, b);
-        if (hit) {
-          const dist = Math.hypot(hit[0] - point[0], hit[1] - point[1]);
-          if (dist > 0.0001 && dist < minDist) {
-            minDist = dist;
-            closest = hit;
+          if(r.type==='of') {
+            const pts=buildCoords(r.lhs); pts.forEach(p=>addPt(code,p));
+            if(pts.length>=2){d.lhs=extendLine(pts.map(p=>p.coord),ring); const{solid,dashed}=clipLine(d.lhs,ring); solid.forEach(s=>solidF.push({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:s}})); dashed.forEach(s=>dashF.push({type:'Feature',properties:{},geometry:{type:'LineString',coordinates:s}}));}
           }
-        }
-      }
-      
-      return closest;
-    }
-
-    function clipPolyline(coords, ring) {
-      const solid = [];
-      const dashed = [];
-
-      for (let i = 0; i < coords.length - 1; i++) {
-        const p1 = coords[i];
-        const p2 = coords[i + 1];
-
-        const p1Inside = pointInPolygon(p1, ring);
-        const p2Inside = pointInPolygon(p2, ring);
-
-        if (p1Inside && p2Inside) {
-          solid.push([p1, p2]);
-        } else if (!p1Inside && !p2Inside) {
-          let crossings = [];
-          for (let j = 0; j < ring.length - 1; j++) {
-            const hit = lineIntersection(p1, p2, ring[j], ring[j + 1]);
-            if (hit) {
-              const dist = Math.hypot(hit[0] - p1[0], hit[1] - p1[1]);
-              crossings.push({ point: hit, dist });
-            }
-          }
-
-          if (crossings.length >= 2) {
-            crossings.sort((a, b) => a.dist - b.dist);
-            dashed.push([p1, crossings[0].point]);
-            solid.push([crossings[0].point, crossings[1].point]);
-            dashed.push([crossings[1].point, p2]);
-          } else {
-            dashed.push([p1, p2]);
-          }
-        } else {
-          let crossing = null;
-          for (let j = 0; j < ring.length - 1; j++) {
-            const hit = lineIntersection(p1, p2, ring[j], ring[j + 1]);
-            if (hit) {
-              crossing = hit;
-              break;
-            }
-          }
-
-          if (crossing) {
-            if (p1Inside) {
-              solid.push([p1, crossing]);
-              dashed.push([crossing, p2]);
-            } else {
-              dashed.push([p1, crossing]);
-              solid.push([crossing, p2]);
-            }
-          } else {
-            if (p1Inside || p2Inside) {
-              solid.push([p1, p2]);
-            } else {
-              dashed.push([p1, p2]);
-            }
-          }
-        }
-      }
-
-      return { solid, dashed };
-    }
-
-    function drawSplitLines() {
-      const solidLineFeatures = [];
-      const dashedLineFeatures = [];
-      const pointFeatures = [];
-      const splitLabelFeatures = [];
-
-      const seenPoint = new Set();
-      const addPoint = (area, p) => {
-        const key = `${area}|${p.name}|${p.coord[0].toFixed(6)}|${p.coord[1].toFixed(6)}`;
-        if (seenPoint.has(key)) return;
-        seenPoint.add(key);
-        pointFeatures.push({
-          type: 'Feature',
-          properties: { area, name: p.name },
-          geometry: { type: 'Point', coordinates: p.coord }
+          return d;
         });
-      };
-
-      const buildLineCoords = (sideText) => {
-        const tokens = tokenizeSplitSide(sideText);
-        const coords = [];
-        tokens.forEach(tok => {
-          const resolved = resolveTokenToCoord(tok);
-          if (resolved) {
-            coords.push(resolved);
-          } else {
-            console.warn('Unresolved split token:', tok);
-          }
-        });
-        return coords;
-      };
-
-      const getAreaRing = (areaCode) => {
-        const feature = areaGeoJSON?.features?.find(f => 
-          f.properties?.area_code?.toUpperCase() === areaCode.toUpperCase()
-        );
-        return feature?.geometry?.coordinates?.[0] || null;
-      };
-
-      const extendLineToRing = (coords, ring) => {
-        if (!coords || coords.length < 2) return coords;
-        
-        const firstDir = [
-          coords[0][0] - coords[1][0],
-          coords[0][1] - coords[1][1]
-        ];
-        const firstLen = Math.hypot(firstDir[0], firstDir[1]);
-        const firstNorm = firstLen > 0 ? [firstDir[0] / firstLen, firstDir[1] / firstLen] : [0, 0];
-        const startBoundary = extendToBoundary(coords[0], firstNorm, ring);
-
-        const lastIdx = coords.length - 1;
-        const lastDir = [
-          coords[lastIdx][0] - coords[lastIdx - 1][0],
-          coords[lastIdx][1] - coords[lastIdx - 1][1]
-        ];
-        const lastLen = Math.hypot(lastDir[0], lastDir[1]);
-        const lastNorm = lastLen > 0 ? [lastDir[0] / lastLen, lastDir[1] / lastLen] : [0, 0];
-        const endBoundary = extendToBoundary(coords[lastIdx], lastNorm, ring);
-
-        return [
-          ...(startBoundary ? [startBoundary] : []),
-          ...coords,
-          ...(endBoundary ? [endBoundary] : [])
-        ];
-      };
-
-      Object.entries(areaSplits || {}).forEach(([areaCode, rules]) => {
-        const ring = getAreaRing(areaCode);
-        if (!ring) return;
-
-        const ruleLineData = [];
-
-        rules.forEach((rule, idx) => {
-          const lineData = { rule, idx, lhsExtended: null, rhsExtended: null };
-
-          if (rule.type === 'between') {
-            const lhsPts = buildLineCoords(rule.lhs);
-            const rhsPts = buildLineCoords(rule.rhs);
-            
-            lhsPts.forEach(p => addPoint(areaCode, p));
-            rhsPts.forEach(p => addPoint(areaCode, p));
-            
-            if (lhsPts.length >= 2) {
-              const coords = lhsPts.map(p => p.coord);
-              lineData.lhsExtended = extendLineToRing(coords, ring);
-              
-              const { solid, dashed } = clipPolyline(lineData.lhsExtended, ring);
-              solid.forEach(seg => {
-                solidLineFeatures.push({
-                  type: 'Feature',
-                  properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'lhs', idx },
-                  geometry: { type: 'LineString', coordinates: seg }
-                });
-              });
-              dashed.forEach(seg => {
-                dashedLineFeatures.push({
-                  type: 'Feature',
-                  properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'lhs', idx },
-                  geometry: { type: 'LineString', coordinates: seg }
-                });
-              });
-            }
-            
-            if (rhsPts.length >= 2) {
-              const coords = rhsPts.map(p => p.coord);
-              lineData.rhsExtended = extendLineToRing(coords, ring);
-              
-              const { solid, dashed } = clipPolyline(lineData.rhsExtended, ring);
-              solid.forEach(seg => {
-                solidLineFeatures.push({
-                  type: 'Feature',
-                  properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'rhs', idx },
-                  geometry: { type: 'LineString', coordinates: seg }
-                });
-              });
-              dashed.forEach(seg => {
-                dashedLineFeatures.push({
-                  type: 'Feature',
-                  properties: { area: areaCode, qnh: rule.qnh, type: 'between', side: 'rhs', idx },
-                  geometry: { type: 'LineString', coordinates: seg }
-                });
-              });
-            }
-          }
-
-          if (rule.type === 'of') {
-            const pts = buildLineCoords(rule.lhs);
-            pts.forEach(p => addPoint(areaCode, p));
-
-            if (pts.length >= 2) {
-              const coords = pts.map(p => p.coord);
-              lineData.lhsExtended = extendLineToRing(coords, ring);
-              
-              const { solid, dashed } = clipPolyline(lineData.lhsExtended, ring);
-              solid.forEach(seg => {
-                solidLineFeatures.push({
-                  type: 'Feature',
-                  properties: { area: areaCode, qnh: rule.qnh, type: 'of', dir: rule.dir || '', idx },
-                  geometry: { type: 'LineString', coordinates: seg }
-                });
-              });
-              dashed.forEach(seg => {
-                dashedLineFeatures.push({
-                  type: 'Feature',
-                  properties: { area: areaCode, qnh: rule.qnh, type: 'of', dir: rule.dir || '', idx },
-                  geometry: { type: 'LineString', coordinates: seg }
-                });
-              });
-            }
-          }
-
-          ruleLineData.push(lineData);
-        });
-
-        const samplePoints = generateSamplePoints(ring, 150);
-
-        rules.forEach((rule, ruleIdx) => {
-          if (!rule.qnh) return;
-
-          const lineData = ruleLineData.find(d => d.idx === ruleIdx);
-          let zonePoints = [];
-
-          if (rule.type === 'of' && rule.dir) {
-            if (lineData?.lhsExtended && lineData.lhsExtended.length >= 2) {
-              zonePoints = samplePoints.filter(pt =>
-                isPointOnCompassSideOfLine(pt, lineData.lhsExtended, rule.dir)
-              );
-            }
-          } else if (rule.type === 'between') {
-            if (lineData?.lhsExtended && lineData?.rhsExtended) {
-              zonePoints = samplePoints.filter(pt =>
-                isPointBetweenLines(pt, lineData.lhsExtended, lineData.rhsExtended)
-              );
-            }
-          } else if (rule.type === 'rest') {
-            zonePoints = samplePoints.filter(pt => {
-              for (let i = 0; i < rules.length; i++) {
-                if (i === ruleIdx || !rules[i].qnh) continue;
-
-                const otherRule = rules[i];
-                const otherLineData = ruleLineData.find(d => d.idx === i);
-
-                if (otherRule.type === 'of' && otherRule.dir && otherLineData?.lhsExtended) {
-                  if (isPointOnCompassSideOfLine(pt, otherLineData.lhsExtended, otherRule.dir)) {
-                    return false;
-                  }
-                } else if (otherRule.type === 'between' && otherLineData?.lhsExtended && otherLineData?.rhsExtended) {
-                  if (isPointBetweenLines(pt, otherLineData.lhsExtended, otherLineData.rhsExtended)) {
-                    return false;
-                  }
-                }
-              }
-              return true;
-            });
-          }
-
-          if (zonePoints.length > 0) {
-            const centroid = calculateCentroidOfPoints(zonePoints);
-            
-            if (pointInPolygon(centroid, ring)) {
-              splitLabelFeatures.push({
-                type: 'Feature',
-                properties: {
-                  area: areaCode,
-                  qnh: rule.qnh,
-                  ruleType: rule.type,
-                  ruleIndex: ruleIdx,
-                  direction: rule.dir || ''
-                },
-                geometry: { type: 'Point', coordinates: centroid }
-              });
-            } else {
-              let closestInside = null;
-              let minDist = Infinity;
-              for (const pt of zonePoints) {
-                const dist = Math.hypot(pt[0] - centroid[0], pt[1] - centroid[1]);
-                if (dist < minDist) {
-                  minDist = dist;
-                  closestInside = pt;
-                }
-              }
-              
-              if (closestInside) {
-                splitLabelFeatures.push({
-                  type: 'Feature',
-                  properties: {
-                    area: areaCode,
-                    qnh: rule.qnh,
-                    ruleType: rule.type,
-                    ruleIndex: ruleIdx,
-                    direction: rule.dir || ''
-                  },
-                  geometry: { type: 'Point', coordinates: closestInside }
-                });
-              }
-            }
-          }
+        const samples = samplePts(ring, 150);
+        rules.forEach((r,i) => {
+          if(!r.qnh) return;
+          const d=ruleData[i]; let zone=[];
+          if(r.type==='of'&&r.dir&&d.lhs?.length>=2) zone=samples.filter(p=>onCompassSide(p,d.lhs,r.dir));
+          else if(r.type==='between'&&d.lhs&&d.rhs) zone=samples.filter(p=>between(p,d.lhs,d.rhs));
+          else if(r.type==='rest') zone=samples.filter(p=>{for(let j=0;j<rules.length;j++){if(j===i||!rules[j].qnh)continue;const o=rules[j],od=ruleData[j];if(o.type==='of'&&o.dir&&od.lhs&&onCompassSide(p,od.lhs,o.dir))return false;if(o.type==='between'&&od.lhs&&od.rhs&&between(p,od.lhs,od.rhs))return false;}return true;});
+          if(zone.length) { const c=centroid(zone); lblF.push({type:'Feature',properties:{qnh:r.qnh},geometry:{type:'Point',coordinates:pointInPoly(c,ring)?c:zone[0]}}); }
         });
       });
 
-      const solidLineFC = { type: 'FeatureCollection', features: solidLineFeatures };
-      const dashedLineFC = { type: 'FeatureCollection', features: dashedLineFeatures };
-      const pointFC = { type: 'FeatureCollection', features: pointFeatures };
-      const splitLabelFC = { type: 'FeatureCollection', features: splitLabelFeatures };
-
-      if (map.getSource('qnh-split-labels')) {
-        map.getSource('qnh-split-labels').setData(splitLabelFC);
-      } else {
-        map.addSource('qnh-split-labels', { type: 'geojson', data: splitLabelFC });
-        map.addLayer({
-          id: 'qnh-split-labels',
-          type: 'symbol',
-          source: 'qnh-split-labels',
-          layout: {
-            'text-field': ['to-string', ['get', 'qnh']],
-            'text-font': ['Noto Sans Regular'],
-            'text-size': 18,
-            'text-allow-overlap': true,
-            'text-ignore-placement': true,
-            'symbol-z-order': 'source'
-          },
-          paint: {
-            'text-color': '#1f9e45',
-            'text-halo-color': '#fff',
-            'text-halo-width': 1.2
-          }
-        });
-      }
-
-      if (map.getSource('qnh-split-lines')) {
-        map.getSource('qnh-split-lines').setData(solidLineFC);
-      } else {
-        map.addSource('qnh-split-lines', { type: 'geojson', data: solidLineFC });
-        map.addLayer({
-          id: 'qnh-split-lines',
-          type: 'line',
-          source: 'qnh-split-lines',
-          paint: { 'line-color': '#1f9e45', 'line-width': 1.5 }
-        });
-      }
-
-      if (map.getSource('qnh-split-lines-dashed')) {
-        map.getSource('qnh-split-lines-dashed').setData(dashedLineFC);
-      } else {
-        map.addSource('qnh-split-lines-dashed', { type: 'geojson', data: dashedLineFC });
-        map.addLayer({
-          id: 'qnh-split-lines-dashed',
-          type: 'line',
-          source: 'qnh-split-lines-dashed',
-          paint: {
-            'line-color': '#1f9e45',
-            'line-width': 1.5,
-            'line-dasharray': [3, 3]
-          }
-        });
-      }
-
-      if (map.getSource('qnh-split-points')) {
-        map.getSource('qnh-split-points').setData(pointFC);
-      } else {
-        map.addSource('qnh-split-points', { type: 'geojson', data: pointFC });
-        map.addLayer({
-          id: 'qnh-split-points',
-          type: 'symbol',
-          source: 'qnh-split-points',
-          layout: {
-            'text-field': '×',
-            'text-size': 16,
-            'text-allow-overlap': true,
-            'symbol-z-order': 'source'
-          },
-          paint: {
-            'text-color': '#000000',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1.5
-          }
-        });
-        map.addLayer({
-          id: 'qnh-split-point-labels',
-          type: 'symbol',
-          source: 'qnh-split-points',
-          layout: {
-            'text-field': ['get', 'name'],
-            'text-size': 9,
-            'text-offset': [0, 1.2],
-            'text-anchor': 'top'
-          },
-          paint: {
-            'text-color': '#111111',
-            'text-halo-color': '#ffffff',
-            'text-halo-width': 1.5
-          }
-        });
-      }
-
-      console.log(`Drew ${solidLineFeatures.length} solid lines, ${dashedLineFeatures.length} dashed lines, ${splitLabelFeatures.length} split labels, and ${pointFeatures.length} reference points`);
+      const upd = (id,fc,cfg) => { if(map.getSource(id)) map.getSource(id).setData(fc); else { map.addSource(id,{type:'geojson',data:fc}); map.addLayer(cfg); }};
+      // Green split lines
+      upd('split-solid',{type:'FeatureCollection',features:solidF},{id:'split-solid',type:'line',source:'split-solid',paint:{'line-color':'#3fb950','line-width':1.5}});
+      upd('split-dash',{type:'FeatureCollection',features:dashF},{id:'split-dash',type:'line',source:'split-dash',paint:{'line-color':'#3fb950','line-width':1.5,'line-dasharray':[3,3]}});
+      // Green split QNH labels
+      upd('split-lbl',{type:'FeatureCollection',features:lblF},{id:'split-lbl',type:'symbol',source:'split-lbl',layout:{'text-field':['to-string',['get','qnh']],'text-font':['Noto Sans Regular'],'text-size':16,'text-allow-overlap':true},paint:{'text-color':'#3fb950','text-halo-color':'#000000','text-halo-width':2}});
+      if(!map.getSource('split-pts')) {
+        map.addSource('split-pts',{type:'geojson',data:{type:'FeatureCollection',features:ptF}});
+        map.addLayer({id:'split-pts',type:'symbol',source:'split-pts',layout:{'text-field':'×','text-size':14,'text-allow-overlap':true},paint:{'text-color':'#ffffff','text-halo-color':'#000000','text-halo-width':1.5}});
+        map.addLayer({id:'split-pt-lbl',type:'symbol',source:'split-pts',layout:{'text-field':['get','name'],'text-size':9,'text-offset':[0,1.2],'text-anchor':'top'},paint:{'text-color':'#8b949e','text-halo-color':'#000000','text-halo-width':1.5}});
+      } else map.getSource('split-pts').setData({type:'FeatureCollection',features:ptF});
     }
-
-    // ============================================================
-    // EXPORT FUNCTIONS - IMPROVED
-    // ============================================================
-
-    function waitForMapReady() {
-      return new Promise((resolve) => {
-        if (mapFullyReady && map && map.loaded()) {
-          resolve();
-        } else {
-          const checkInterval = setInterval(() => {
-            if (mapFullyReady && map && map.loaded()) {
-              clearInterval(checkInterval);
-              resolve();
-            }
-          }, 100);
-          
-          // Timeout after 30 seconds
-          setTimeout(() => {
-            clearInterval(checkInterval);
-            resolve();
-          }, 30000);
-        }
-      });
-    }
-
-    function waitForMapIdle() {
-      return new Promise(resolve => {
-        if (!map) {
-          resolve();
-          return;
-        }
-
-        const onIdle = () => {
-          map.off('idle', onIdle);
-          resolve();
-        };
-
-        if (!map.isMoving() && map.loaded()) {
-          // Give extra time for tiles to load
-          setTimeout(resolve, 500);
-        } else {
-          map.once('idle', onIdle);
-          setTimeout(() => {
-            map.off('idle', onIdle);
-            resolve();
-          }, 5000);
-        }
-      });
-    }
-
-    async function captureMapAsBlob(regionCode) {
-      const region = EXPORT_REGIONS[regionCode];
-      if (!region) {
-        throw new Error(`Unknown region: ${regionCode}`);
-      }
-
-      // Store current view
-      const currentCenter = map.getCenter();
-      const currentZoom = map.getZoom();
-
-      try {
-        // Fit to region
-        const mapBounds = new maplibregl.LngLatBounds(region.bounds[0], region.bounds[1]);
-        map.fitBounds(mapBounds, { padding: 10, duration: 0, maxZoom: 6 });
-
-        // Wait for rendering
-        await waitForMapIdle();
-        await new Promise(resolve => setTimeout(resolve, 1000));
-
-        // Get canvas
-        const canvas = map.getCanvas();
-        if (!canvas) {
-          throw new Error('Canvas not available');
-        }
-
-        // Create blob
-        const blob = await new Promise((resolve, reject) => {
-          try {
-            canvas.toBlob((b) => {
-              if (b) {
-                resolve(b);
-              } else {
-                reject(new Error('Failed to create blob from canvas'));
-              }
-            }, 'image/png', 1.0);
-          } catch (e) {
-            reject(e);
-          }
-        });
-
-        // Restore view
-        map.jumpTo({ center: currentCenter, zoom: currentZoom });
-
-        return blob;
-      } catch (error) {
-        // Restore view on error
-        map.jumpTo({ center: currentCenter, zoom: currentZoom });
-        throw error;
-      }
-    }
-
-    async function uploadToR2(blob, filename) {
-      const formData = new FormData();
-      formData.append('file', blob, filename);
-
-      const response = await fetchWithTimeout(UPLOAD_WORKER_URL, {
-        method: 'POST',
-        body: formData
-      }, 60000);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Upload failed: ${response.status} - ${errorText}`);
-      }
-
-      return await response.json();
-    }
-
-    async function autoExportAllToR2() {
-      console.log('Starting auto-export to R2...');
-      
-      await waitForMapReady();
-      
-      const regions = ['AU', 'NE', 'SE', 'NW', 'SW'];
-      let successCount = 0;
-      const errors = [];
-
-      for (const regionCode of regions) {
-        try {
-          const blob = await captureMapAsBlob(regionCode);
-          
-          if (!blob || blob.size < 1000) {
-            throw new Error(`Image too small: ${blob?.size || 0} bytes`);
-          }
-
-          const filename = `qnh-${regionCode.toLowerCase()}.png`;
-          await uploadToR2(blob, filename);
-          
-          console.log(`✓ Uploaded ${filename} (${blob.size} bytes)`);
-          successCount++;
-
-          // Small delay between exports
-          await new Promise(resolve => setTimeout(resolve, 500));
-        } catch (error) {
-          console.error(`✗ Failed to export ${regionCode}:`, error);
-          errors.push({ region: regionCode, error: error.message });
-        }
-      }
-
-      console.log(`Auto-export complete: ${successCount}/${regions.length} regions uploaded`);
-      
-      if (successCount === regions.length) {
-        showSuccess(`All ${successCount} regional maps uploaded to R2`);
-      } else if (successCount > 0) {
-        showWarning(`Uploaded ${successCount}/${regions.length} maps. Failed: ${errors.map(e => e.region).join(', ')}`);
-      } else {
-        showWarning('Failed to upload any maps to R2');
-      }
-
-      return { successCount, total: regions.length, errors };
-    }
-
-    // Manual export button handler
-    async function manualExportAllToR2() {
-      showSuccess('Starting upload to R2...');
-      await autoExportAllToR2();
-    }
-
-    function toggleExportPanel() {
-      const panel = document.getElementById('exportControls');
-      panel.classList.toggle('visible');
-    }
-
-    async function exportRegion(regionCode) {
-      if (!map || !map.loaded()) {
-        showWarning('Map is not ready yet.');
-        return;
-      }
-
-      try {
-        let regionName;
-
-        if (regionCode === 'CURRENT') {
-          regionName = 'Current View';
-          const canvas = map.getCanvas();
-          const dataURL = canvas.toDataURL('image/png');
-          downloadDataURL(dataURL, `qnh-current-${Date.now()}.png`);
-        } else {
-          const region = EXPORT_REGIONS[regionCode];
-          if (!region) {
-            showWarning(`Unknown region: ${regionCode}`);
-            return;
-          }
-
-          regionName = region.name;
-          const blob = await captureMapAsBlob(regionCode);
-          
-          const dataURL = await new Promise(resolve => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsDataURL(blob);
-          });
-          
-          downloadDataURL(dataURL, `qnh-${regionCode.toLowerCase()}-${Date.now()}.png`);
-        }
-
-        showSuccess(`Exported ${regionName} map`);
-      } catch (error) {
-        console.error('Export failed:', error);
-        showWarning(`Failed to export map: ${error.message}`);
-      }
-    }
-
-    function downloadDataURL(dataURL, filename) {
-      const link = document.createElement('a');
-      link.download = filename;
-      link.href = dataURL;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
-
-    // Global exports
-    window.toggleExportPanel = toggleExportPanel;
-    window.exportRegion = exportRegion;
-    window.manualExportAllToR2 = manualExportAllToR2;
-
   </script>
 </body>
 </html>
