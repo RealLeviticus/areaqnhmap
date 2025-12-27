@@ -228,6 +228,53 @@
       color: var(--text-muted);
     }
 
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.45);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 200;
+      padding: 16px;
+    }
+
+    .modal-backdrop.visible { display: flex; }
+
+    .disclaimer-modal {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 20px 24px;
+      max-width: 420px;
+      width: 100%;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    }
+
+    .disclaimer-modal h2 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+    }
+
+    .disclaimer-modal p {
+      margin: 0 0 12px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    .disclaimer-modal button {
+      padding: 8px 16px;
+      border-radius: 6px;
+      border: none;
+      background: var(--accent);
+      color: #fff;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    .disclaimer-modal button:hover {
+      background: #164ea5;
+    }
+
     footer {
       text-align: center;
       padding: 24px;
@@ -257,7 +304,7 @@
     <div class="header-content">
       <div>
         <h1>Area QNH Static Maps</h1>
-        <p class="subtitle">Australian aviation altimeter setting regions</p>
+        <p class="subtitle">Australian Area QNH Map</p>
       </div>
       <div class="status">
         <span class="status-dot" id="statusDot"></span>
@@ -368,13 +415,25 @@
     </div>
   </main>
 
+  <div id="disclaimerModal" class="modal-backdrop">
+    <div class="disclaimer-modal">
+      <h2>Simulation Use Only</h2>
+      <p>
+        Not for real-world aviation use.
+        <br>
+        <br>
+        Always use official sources for flight planning and in-flight decisions.
+      </p>
+      <button type="button" onclick="closeDisclaimer()">I understand</button>
+    </div>
+  </div>
+
   <footer>
     <p>
-      Data sourced from Bureau of Meteorology.
+      Data sourced from Australian Bureau of Meteorology.
       Images auto-generated every 5 minutes by server.
       <br>
-      <a href="index.html">View Interactive Map</a> |
-      Built for Australian aviation.
+      Built for VATPAC.
     </p>
   </footer>
 
@@ -529,11 +588,23 @@
       }
     }
 
+    function showDisclaimer() {
+      const modal = document.getElementById('disclaimerModal');
+      if (modal) modal.classList.add('visible');
+    }
+
+    function closeDisclaimer() {
+      const modal = document.getElementById('disclaimerModal');
+      if (modal) modal.classList.remove('visible');
+    }
+
     document.addEventListener('DOMContentLoaded', () => {
       refreshImages();
       fetchValidity();
+      showDisclaimer();
     });
     window.refreshImages = refreshImages;
+    window.closeDisclaimer = closeDisclaimer;
   </script>
 </body>
 
