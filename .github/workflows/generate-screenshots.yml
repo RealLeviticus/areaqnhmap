@@ -45,7 +45,7 @@ jobs:
             libgbm1 \
             libnss3 \
             libxss1 \
-            libasound2 \
+            libasound2t64 \
             libatk-bridge2.0-0 \
             libgtk-3-0 \
             libxkbcommon0 \
@@ -92,13 +92,11 @@ jobs:
         env:
           DISPLAY: ":99"
           LIBGL_ALWAYS_SOFTWARE: "1"
-          # Helps Chromium on some runners where sandboxed GPU init is odd
           MOZ_DISABLE_RDD_SANDBOX: "1"
         shell: bash
         run: |
           set -e
 
-          # Start a virtual display
           Xvfb :99 -screen 0 1920x1080x24 > /dev/null 2>&1 &
           sleep 1
 
@@ -122,23 +120,19 @@ jobs:
             if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
             const browser = await puppeteer.launch({
-              // IMPORTANT: "new" headless mode has been flaky for WebGL on some CI images.
-              // Headful + Xvfb is typically the most reliable.
-              headless: false,
+              headless: false, // headful + Xvfb is most reliable for WebGL on CI
               args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
 
-                // WebGL / GPU settings
+                // WebGL / renderer settings
                 '--enable-webgl',
                 '--ignore-gpu-blocklist',
-                '--disable-gpu',                 // still OK, ANGLE/SwiftShader will handle it
                 '--use-gl=angle',
                 '--use-angle=swiftshader',
-                '--disable-software-rasterizer=false',
 
-                // Sometimes helps WebGL init in CI
+                // reduce weirdness on some runners
                 '--disable-features=Vulkan',
                 '--disable-features=UseSkiaRenderer',
               ]
@@ -149,7 +143,6 @@ jobs:
               page.setDefaultTimeout(120000);
               await page.setViewport({ width: 1400, height: 1000, deviceScaleFactor: 2 });
 
-              // Useful debugging
               page.on('console', msg => console.log('[PAGE]', msg.text()));
               page.on('pageerror', err => console.log('[PAGE ERROR]', err.message));
               page.on('requestfailed', req => console.log('[REQ FAIL]', req.url(), req.failure()?.errorText));
@@ -157,7 +150,6 @@ jobs:
                 if (res.status() >= 400) console.log(`[HTTP ${res.status()}] ${res.url()}`);
               });
 
-              // Capture the map instance even if not attached to window.map
               await page.evaluateOnNewDocument(() => {
                 let internal;
                 Object.defineProperty(window, 'maplibregl', {
@@ -185,14 +177,11 @@ jobs:
 
               await page.waitForSelector('#map', { timeout: 120000 });
 
-              // Wait for map instance to exist and load
               await page.waitForFunction(() => window.__map && typeof window.__map.loaded === 'function', { timeout: 120000 });
               await page.waitForFunction(() => window.__map.loaded(), { timeout: 120000 });
 
-              // Ensure the canvas exists
               await page.waitForSelector('#map canvas', { timeout: 120000 });
 
-              // Force labels to render even if they would normally collide and hide
               await page.evaluate(() => {
                 const m = window.__map;
                 if (!m) return;
@@ -290,16 +279,3 @@ jobs:
           git add .qnh-cache/last_issued.txt
           git commit -m "Update QNH issued cache" || echo "No cache changes to commit"
           git push
-
-      # Optional, if you want screenshots committed into the repo as well
-      # - name: Commit screenshots to repo
-      #   if: steps.check-changes.outputs.changed == 'true'
-      #   shell: bash
-      #   run: |
-      #     set -e
-      #     git config user.name "github-actions[bot]"
-      #     git config user.email "github-actions[bot]@users.noreply.github.com"
-      #
-      #     git add screenshots/*.png
-      #     git commit -m "Update QNH screenshots" || echo "No screenshot changes to commit"
-      #     git push
