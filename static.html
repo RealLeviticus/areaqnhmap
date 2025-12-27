@@ -144,7 +144,18 @@
       gap: 12px;
     }
 
+    .region-header-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
     .region-title { font-weight: 600; font-size: 1rem; }
+
+    .region-validity {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
 
     .region-code {
       background: var(--accent);
@@ -262,7 +273,10 @@
     <div class="region-grid" id="regionGrid">
       <div class="region-card" data-region="AU">
         <div class="region-header">
-          <span class="region-title">Australia (Full)</span>
+          <div class="region-header-main">
+            <span class="region-title">Australia (Full)</span>
+            <span class="region-validity"></span>
+          </div>
           <span class="region-code">AU</span>
         </div>
         <div class="region-image-container">
@@ -278,7 +292,10 @@
 
       <div class="region-card" data-region="NE">
         <div class="region-header">
-          <span class="region-title">Northeast (QLD / North NSW)</span>
+          <div class="region-header-main">
+            <span class="region-title">Northeast (QLD / North NSW)</span>
+            <span class="region-validity"></span>
+          </div>
           <span class="region-code">NE</span>
         </div>
         <div class="region-image-container">
@@ -294,7 +311,10 @@
 
       <div class="region-card" data-region="SE">
         <div class="region-header">
-          <span class="region-title">Southeast (VIC / TAS / South NSW)</span>
+          <div class="region-header-main">
+            <span class="region-title">Southeast (VIC / TAS / South NSW)</span>
+            <span class="region-validity"></span>
+          </div>
           <span class="region-code">SE</span>
         </div>
         <div class="region-image-container">
@@ -310,7 +330,10 @@
 
       <div class="region-card" data-region="NW">
         <div class="region-header">
-          <span class="region-title">Northwest (NT / North WA)</span>
+          <div class="region-header-main">
+            <span class="region-title">Northwest (NT / North WA)</span>
+            <span class="region-validity"></span>
+          </div>
           <span class="region-code">NW</span>
         </div>
         <div class="region-image-container">
@@ -326,7 +349,10 @@
 
       <div class="region-card" data-region="SW">
         <div class="region-header">
-          <span class="region-title">Southwest (SA / South WA)</span>
+          <div class="region-header-main">
+            <span class="region-title">Southwest (SA / South WA)</span>
+            <span class="region-validity"></span>
+          </div>
           <span class="region-code">SW</span>
         </div>
         <div class="region-image-container">
@@ -356,6 +382,8 @@
     // Load images directly (no fetch), avoids CORS issues
     const R2_BASE_URL_RAW = 'https://qnh-images.therealleviticus.workers.dev/';
     const R2_BASE_URL = R2_BASE_URL_RAW.replace(/\/+$/, '');
+
+    const QNH_URL = 'https://areaqnh.therealleviticus.workers.dev/';
 
     const regions = ['AU', 'NE', 'SE', 'NW', 'SW'];
     let loadedCount = 0;
@@ -463,7 +491,48 @@
       regions.forEach(loadImage);
     }
 
-    document.addEventListener('DOMContentLoaded', refreshImages);
+    async function fetchValidity() {
+      try {
+        const res = await fetch(QNH_URL + '?t=' + Date.now());
+        if (!res.ok) return;
+        const text = await res.text();
+
+        const validM = [...text.matchAll(/Valid:\s*([^\n]*?)(?=Issued:|\n|$)/gi)];
+        const issueM = [...text.matchAll(/Issued:\s*([^\n]*)/gi)];
+
+        if (!validM.length || !issueM.length) return;
+
+        const rawValid = validM.at(-1)[1].replace(/\s+/g, ' ').trim();
+        const rawIssued = issueM.at(-1)[1].replace(/\s+/g, ' ').trim();
+
+        // Try to normalise into "0400 UTC - 0700 UTC 27 December 2025"
+        let valid = rawValid;
+        let issued = rawIssued;
+
+        const mValid = rawValid.match(/(\d{4})\s*UTC?.*?(\d{4})\s*UTC?.*?(\d{1,2}\s+\w+\s+\d{4})/i);
+        if (mValid) {
+          valid = `${mValid[1]} UTC - ${mValid[2]} UTC ${mValid[3]}`;
+        }
+
+        const mIssued = rawIssued.match(/(\d{4})\s*UTC?.*?(\d{1,2}\s+\w+\s+\d{4})/i);
+        if (mIssued) {
+          issued = `${mIssued[1]} UTC ${mIssued[2]}`;
+        }
+
+        const msg = `Valid: ${valid} | Issued: ${issued}`;
+
+        document.querySelectorAll('.region-validity').forEach(el => {
+          el.textContent = msg;
+        });
+      } catch (e) {
+        console.error('Failed to fetch validity info', e);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      refreshImages();
+      fetchValidity();
+    });
     window.refreshImages = refreshImages;
   </script>
 </body>
