@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -23,8 +24,17 @@
       --split-color: #1a8f2a;
     }
 
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      height: 100%;
+    }
+
     body {
       font-family: "Segoe UI", system-ui, sans-serif;
       background: var(--bg);
@@ -48,8 +58,16 @@
       gap: 12px;
     }
 
-    h1 { font-size: 1.4rem; font-weight: 600; }
-    .subtitle { color: var(--text-muted); font-size: 0.85rem; margin-top: 2px; }
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 600;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      margin-top: 2px;
+    }
 
     #validity {
       font-size: 0.85rem;
@@ -66,10 +84,27 @@
       background: var(--success);
       animation: pulse 2s infinite;
     }
-    .status-dot.loading { background: var(--warning); }
-    .status-dot.error { background: var(--error); animation: none; }
 
-    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .status-dot.loading {
+      background: var(--warning);
+    }
+
+    .status-dot.error {
+      background: var(--error);
+      animation: none;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
 
     .nav-links a {
       color: var(--accent);
@@ -81,34 +116,61 @@
       transition: all 0.2s;
       background: #fff;
     }
-    .nav-links a:hover { background: var(--accent); color: #fff; }
 
-    #map { flex: 1; width: 100%; }
+    .nav-links a:hover {
+      background: var(--accent);
+      color: #fff;
+    }
+
+    #map {
+      flex: 1;
+      width: 100%;
+    }
 
     /* Make MapLibre UI match light theme */
     .maplibregl-ctrl-attrib {
-      background: rgba(255,255,255,0.9) !important;
+      background: rgba(255, 255, 255, 0.9) !important;
       color: var(--text-muted) !important;
       border: 1px solid var(--border) !important;
       border-radius: 6px !important;
     }
-    .maplibregl-ctrl-attrib a { color: var(--accent) !important; }
+
+    .maplibregl-ctrl-attrib a {
+      color: var(--accent) !important;
+    }
+
     .maplibregl-ctrl-group {
-      background: rgba(255,255,255,0.95) !important;
+      background: rgba(255, 255, 255, 0.95) !important;
       border: 1px solid var(--border) !important;
       border-radius: 6px !important;
       overflow: hidden;
     }
-    .maplibregl-ctrl-group button { background-color: transparent !important; }
-    .maplibregl-ctrl-group button:hover { background-color: rgba(0,0,0,0.05) !important; }
-    .maplibregl-ctrl-group button span { filter: none; }
+
+    .maplibregl-ctrl-group button {
+      background-color: transparent !important;
+    }
+
+    .maplibregl-ctrl-group button:hover {
+      background-color: rgba(0, 0, 0, 0.05) !important;
+    }
+
+    .maplibregl-ctrl-group button span {
+      filter: none;
+    }
 
     @media (max-width: 768px) {
-      .header-content { flex-direction: column; align-items: flex-start; }
-      header { padding: 10px 12px; }
+      .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      header {
+        padding: 10px 12px;
+      }
     }
   </style>
 </head>
+
 <body>
   <header>
     <div class="header-content">
@@ -168,7 +230,7 @@
     }
 
     // ====== AREAS GEOJSON (unchanged) ======
-    const AREAS = {"type":"FeatureCollection","features":[{"type":"Feature","properties":{"area_code":"AREA-20"},"geometry":{"type":"Polygon","coordinates":[[[148.383333,-32.75],[150.0,-29.0],[154.703056,-28.043611],[155.0,-28.833333],[152.666667,-34.333333],[151.177222,-33.946111],[150.988333,-33.924444],[149.651944,-33.409444],[148.383333,-32.75]]]}},{"type":"Feature","properties":{"area_code":"AREA-21"},"geometry":{"type":"Polygon","coordinates":[[[146.924722,-36.195278],[148.383333,-32.75],[149.651944,-33.409444],[150.988333,-33.924444],[151.177222,-33.946111],[152.666667,-34.333333],[150.870556,-37.881111],[149.976111,-37.503889],[146.924722,-36.195278]]]}},{"type":"Feature","properties":{"area_code":"AREA-22"},"geometry":{"type":"Polygon","coordinates":[[[141.0,-29.0],[150.0,-29.0],[148.383333,-32.75],[146.924722,-36.195278],[141.0,-33.65],[141.0,-29.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-24"},"geometry":{"type":"Polygon","coordinates":[[[152.666667,-34.333333],[155.0,-28.833333],[163.0,-28.5],[163.0,-31.333333],[152.666667,-34.333333]]]}},{"type":"Feature","properties":{"area_code":"AREA-30"},"geometry":{"type":"Polygon","coordinates":[[[141.0,-33.65],[146.924722,-36.195278],[149.976111,-37.503889],[150.870556,-37.881111],[150.2,-39.57],[142.8575,-39.57],[141.0,-39.57],[141.0,-33.65]]]}},{"type":"Feature","properties":{"area_code":"AREA-40"},"geometry":{"type":"Polygon","coordinates":[[[147.820833,-23.156111],[152.864444,-23.155833],[154.703056,-28.043611],[150.0,-29.0],[148.183333,-23.566667],[147.820833,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-41"},"geometry":{"type":"Polygon","coordinates":[[[138.0,-26.0],[138.0,-23.156111],[147.820833,-23.156111],[148.183333,-23.566667],[150.0,-29.0],[141.0,-29.0],[141.0,-26.0],[138.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-43"},"geometry":{"type":"Polygon","coordinates":[[[138.0,-23.156111],[138.0,-19.0],[143.533333,-18.3],[147.820833,-23.156111],[138.0,-23.156111]]]}},{"type":"Feature","properties":{"area_code":"AREA-44"},"geometry":{"type":"Polygon","coordinates":[[[143.533333,-18.3],[148.0,-18.283333],[152.864444,-23.155833],[147.820833,-23.156111],[143.533333,-18.3]]]}},{"type":"Feature","properties":{"area_code":"AREA-45"},"geometry":{"type":"Polygon","coordinates":[[[141.0,-9.833333],[141.033333,-9.616667],[142.083333,-9.261667],[142.805,-9.323889],[143.875,-9.133333],[144.233333,-9.4],[144.089167,-9.942778],[144.026667,-11.5],[144.072222,-11.725],[144.0,-12.0],[147.607778,-16.995833],[148.0,-18.283333],[143.533333,-18.3],[138.0,-19.0],[138.0,-14.0],[141.0,-9.833333]]]}},{"type":"Feature","properties":{"area_code":"AREA-50"},"geometry":{"type":"Polygon","coordinates":[[[134.5,-35.5],[135.372222,-34.686667],[137.716667,-32.5],[141.0,-33.65],[141.0,-39.57],[134.5,-35.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-51"},"geometry":{"type":"Polygon","coordinates":[[[135.0,-30.0],[141.0,-29.0],[141.0,-33.65],[137.716667,-32.5],[135.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-52"},"geometry":{"type":"Polygon","coordinates":[[[129.0,-26.0],[138.0,-26.0],[141.0,-26.0],[141.0,-29.0],[135.0,-30.0],[129.0,-30.0],[129.0,-26.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-53"},"geometry":{"type":"Polygon","coordinates":[[[129.0,-30.0],[135.0,-30.0],[137.716667,-32.5],[135.372222,-34.686667],[134.5,-35.5],[131.0,-32.5],[129.0,-33.0],[129.0,-30.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-60"},"geometry":{"type":"Polygon","coordinates":[[[112.5,-27.5],[118.0,-27.5],[119.0,-32.25],[113.5,-33.5],[112.5,-27.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-61"},"geometry":{"type":"Polygon","coordinates":[[[119.0,-32.25],[118.0,-27.5],[123.5,-27.5],[123.618333,-30.84],[119.0,-32.25]]]}},{"type":"Feature","properties":{"area_code":"AREA-62"},"geometry":{"type":"Polygon","coordinates":[[[123.618333,-30.84],[129.0,-30.0],[129.0,-33.0],[123.5,-35.0],[123.618333,-30.84]]]}},{"type":"Feature","properties":{"area_code":"AREA-63"},"geometry":{"type":"Polygon","coordinates":[[[113.5,-33.5],[119.0,-32.25],[123.618333,-30.84],[123.5,-35.0],[116.0,-36.25],[113.5,-33.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-64"},"geometry":{"type":"Polygon","coordinates":[[[123.5,-23.88],[129.0,-23.88],[129.0,-30.0],[123.618333,-30.84],[123.5,-27.5],[123.5,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-65"},"geometry":{"type":"Polygon","coordinates":[[[112.096944,-23.88],[115.984722,-23.88],[118.0,-27.5],[112.5,-27.5],[112.096944,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-66"},"geometry":{"type":"Polygon","coordinates":[[[115.984722,-23.88],[123.5,-23.88],[123.5,-27.5],[118.0,-27.5],[115.984722,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-68"},"geometry":{"type":"Polygon","coordinates":[[[112.0,-23.0],[113.0,-21.0],[117.0,-18.0],[120.0,-18.0],[123.5,-20.5],[123.5,-23.88],[115.984722,-23.88],[112.096944,-23.88],[112.0,-23.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-69"},"geometry":{"type":"Polygon","coordinates":[[[117.0,-18.0],[124.0,-14.0],[126.148056,-13.751667],[127.5,-14.0],[128.416667,-14.833333],[129.0,-14.879444],[129.0,-20.0],[123.5,-20.5],[120.0,-18.0],[117.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-70"},"geometry":{"type":"Polygon","coordinates":[[[142.8575,-39.57],[150.2,-39.57],[149.0,-43.0],[147.5,-44.5],[145.0,-44.0],[142.8575,-39.57]]]}},{"type":"Feature","properties":{"area_code":"AREA-80"},"geometry":{"type":"Polygon","coordinates":[[[129.0,-9.409722],[141.0,-9.833333],[138.0,-14.0],[138.0,-19.0],[129.0,-15.884444],[129.0,-14.879444],[129.0,-9.409722]]]}},{"type":"Feature","properties":{"area_code":"AREA-83"},"geometry":{"type":"Polygon","coordinates":[[[123.5,-20.5],[129.0,-20.0],[129.0,-23.88],[123.5,-23.88],[123.5,-20.5]]]}},{"type":"Feature","properties":{"area_code":"AREA-84"},"geometry":{"type":"Polygon","coordinates":[[[129.0,-20.0],[129.0,-15.884444],[138.0,-19.0],[138.0,-23.156111],[129.0,-22.25],[129.0,-20.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-85"},"geometry":{"type":"Polygon","coordinates":[[[129.0,-23.88],[129.0,-22.25],[138.0,-23.156111],[138.0,-26.0],[129.0,-26.0],[129.0,-23.88]]]}},{"type":"Feature","properties":{"area_code":"AREA-86"},"geometry":{"type":"Polygon","coordinates":[[[124.774444,-10.9125],[126.833333,-9.333333],[129.0,-9.409722],[129.0,-14.879444],[128.416667,-14.833333],[127.5,-14.0],[126.148056,-13.751667],[124.0,-14.0],[124.774444,-10.9125]]]}},{"type":"Feature","properties":{"area_code":"AREA-87"},"geometry":{"type":"Polygon","coordinates":[[[112.0,-18.0],[118.0,-15.0],[124.0,-14.0],[117.0,-18.0],[112.0,-18.0]]]}},{"type":"Feature","properties":{"area_code":"AREA-88"},"geometry":{"type":"Polygon","coordinates":[[[110.0,-19.0],[112.0,-18.0],[117.0,-18.0],[113.0,-21.0],[110.0,-19.0]]]}}]};
+    const AREAS = { "type": "FeatureCollection", "features": [{ "type": "Feature", "properties": { "area_code": "AREA-20" }, "geometry": { "type": "Polygon", "coordinates": [[[148.383333, -32.75], [150.0, -29.0], [154.703056, -28.043611], [155.0, -28.833333], [152.666667, -34.333333], [151.177222, -33.946111], [150.988333, -33.924444], [149.651944, -33.409444], [148.383333, -32.75]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-21" }, "geometry": { "type": "Polygon", "coordinates": [[[146.924722, -36.195278], [148.383333, -32.75], [149.651944, -33.409444], [150.988333, -33.924444], [151.177222, -33.946111], [152.666667, -34.333333], [150.870556, -37.881111], [149.976111, -37.503889], [146.924722, -36.195278]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-22" }, "geometry": { "type": "Polygon", "coordinates": [[[141.0, -29.0], [150.0, -29.0], [148.383333, -32.75], [146.924722, -36.195278], [141.0, -33.65], [141.0, -29.0]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-24" }, "geometry": { "type": "Polygon", "coordinates": [[[152.666667, -34.333333], [155.0, -28.833333], [163.0, -28.5], [163.0, -31.333333], [152.666667, -34.333333]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-30" }, "geometry": { "type": "Polygon", "coordinates": [[[141.0, -33.65], [146.924722, -36.195278], [149.976111, -37.503889], [150.870556, -37.881111], [150.2, -39.57], [142.8575, -39.57], [141.0, -39.57], [141.0, -33.65]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-40" }, "geometry": { "type": "Polygon", "coordinates": [[[147.820833, -23.156111], [152.864444, -23.155833], [154.703056, -28.043611], [150.0, -29.0], [148.183333, -23.566667], [147.820833, -23.156111]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-41" }, "geometry": { "type": "Polygon", "coordinates": [[[138.0, -26.0], [138.0, -23.156111], [147.820833, -23.156111], [148.183333, -23.566667], [150.0, -29.0], [141.0, -29.0], [141.0, -26.0], [138.0, -26.0]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-43" }, "geometry": { "type": "Polygon", "coordinates": [[[138.0, -23.156111], [138.0, -19.0], [143.533333, -18.3], [147.820833, -23.156111], [138.0, -23.156111]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-44" }, "geometry": { "type": "Polygon", "coordinates": [[[143.533333, -18.3], [148.0, -18.283333], [152.864444, -23.155833], [147.820833, -23.156111], [143.533333, -18.3]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-45" }, "geometry": { "type": "Polygon", "coordinates": [[[141.0, -9.833333], [141.033333, -9.616667], [142.083333, -9.261667], [142.805, -9.323889], [143.875, -9.133333], [144.233333, -9.4], [144.089167, -9.942778], [144.026667, -11.5], [144.072222, -11.725], [144.0, -12.0], [147.607778, -16.995833], [148.0, -18.283333], [143.533333, -18.3], [138.0, -19.0], [138.0, -14.0], [141.0, -9.833333]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-50" }, "geometry": { "type": "Polygon", "coordinates": [[[134.5, -35.5], [135.372222, -34.686667], [137.716667, -32.5], [141.0, -33.65], [141.0, -39.57], [134.5, -35.5]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-51" }, "geometry": { "type": "Polygon", "coordinates": [[[135.0, -30.0], [141.0, -29.0], [141.0, -33.65], [137.716667, -32.5], [135.0, -30.0]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-52" }, "geometry": { "type": "Polygon", "coordinates": [[[129.0, -26.0], [138.0, -26.0], [141.0, -26.0], [141.0, -29.0], [135.0, -30.0], [129.0, -30.0], [129.0, -26.0]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-53" }, "geometry": { "type": "Polygon", "coordinates": [[[129.0, -30.0], [135.0, -30.0], [137.716667, -32.5], [135.372222, -34.686667], [134.5, -35.5], [131.0, -32.5], [129.0, -33.0], [129.0, -30.0]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-60" }, "geometry": { "type": "Polygon", "coordinates": [[[112.5, -27.5], [118.0, -27.5], [119.0, -32.25], [113.5, -33.5], [112.5, -27.5]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-61" }, "geometry": { "type": "Polygon", "coordinates": [[[119.0, -32.25], [118.0, -27.5], [123.5, -27.5], [123.618333, -30.84], [119.0, -32.25]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-62" }, "geometry": { "type": "Polygon", "coordinates": [[[123.618333, -30.84], [129.0, -30.0], [129.0, -33.0], [123.5, -35.0], [123.618333, -30.84]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-63" }, "geometry": { "type": "Polygon", "coordinates": [[[113.5, -33.5], [119.0, -32.25], [123.618333, -30.84], [123.5, -35.0], [116.0, -36.25], [113.5, -33.5]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-64" }, "geometry": { "type": "Polygon", "coordinates": [[[123.5, -23.88], [129.0, -23.88], [129.0, -30.0], [123.618333, -30.84], [123.5, -27.5], [123.5, -23.88]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-65" }, "geometry": { "type": "Polygon", "coordinates": [[[112.096944, -23.88], [115.984722, -23.88], [118.0, -27.5], [112.5, -27.5], [112.096944, -23.88]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-66" }, "geometry": { "type": "Polygon", "coordinates": [[[115.984722, -23.88], [123.5, -23.88], [123.5, -27.5], [118.0, -27.5], [115.984722, -23.88]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-68" }, "geometry": { "type": "Polygon", "coordinates": [[[112.0, -23.0], [113.0, -21.0], [117.0, -18.0], [120.0, -18.0], [123.5, -20.5], [123.5, -23.88], [115.984722, -23.88], [112.096944, -23.88], [112.0, -23.0]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-69" }, "geometry": { "type": "Polygon", "coordinates": [[[117.0, -18.0], [124.0, -14.0], [126.148056, -13.751667], [127.5, -14.0], [128.416667, -14.833333], [129.0, -14.879444], [129.0, -20.0], [123.5, -20.5], [120.0, -18.0], [117.0, -18.0]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-70" }, "geometry": { "type": "Polygon", "coordinates": [[[142.8575, -39.57], [150.2, -39.57], [149.0, -43.0], [147.5, -44.5], [145.0, -44.0], [142.8575, -39.57]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-80" }, "geometry": { "type": "Polygon", "coordinates": [[[129.0, -9.409722], [141.0, -9.833333], [138.0, -14.0], [138.0, -19.0], [129.0, -15.884444], [129.0, -14.879444], [129.0, -9.409722]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-83" }, "geometry": { "type": "Polygon", "coordinates": [[[123.5, -20.5], [129.0, -20.0], [129.0, -23.88], [123.5, -23.88], [123.5, -20.5]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-84" }, "geometry": { "type": "Polygon", "coordinates": [[[129.0, -20.0], [129.0, -15.884444], [138.0, -19.0], [138.0, -23.156111], [129.0, -22.25], [129.0, -20.0]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-85" }, "geometry": { "type": "Polygon", "coordinates": [[[129.0, -23.88], [129.0, -22.25], [138.0, -23.156111], [138.0, -26.0], [129.0, -26.0], [129.0, -23.88]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-86" }, "geometry": { "type": "Polygon", "coordinates": [[[124.774444, -10.9125], [126.833333, -9.333333], [129.0, -9.409722], [129.0, -14.879444], [128.416667, -14.833333], [127.5, -14.0], [126.148056, -13.751667], [124.0, -14.0], [124.774444, -10.9125]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-87" }, "geometry": { "type": "Polygon", "coordinates": [[[112.0, -18.0], [118.0, -15.0], [124.0, -14.0], [117.0, -18.0], [112.0, -18.0]]] } }, { "type": "Feature", "properties": { "area_code": "AREA-88" }, "geometry": { "type": "Polygon", "coordinates": [[[110.0, -19.0], [112.0, -18.0], [117.0, -18.0], [113.0, -21.0], [110.0, -19.0]]] } }] };
 
     let areaGeoJSON, areaQnhMap = {}, areaSplits = {}, navPointMap = {}, map;
 
@@ -248,9 +310,8 @@
       ];
     }
 
-    // ✅ KEY CHANGE:
-    // - If an area has splits, we do NOT include it in the main "labels" source at all.
-    // - So its AREA id only appears under the split QNH labels.
+    // If an area has splits, we do NOT include it in the main "labels" source at all.
+    // Its AREA id only appears under the split QNH labels.
     function updateLabels() {
       const features = [];
 
@@ -447,53 +508,132 @@
     }
 
     function tokenize(s) {
-      const skip = new Set(['N','S','E','W','NE','NW','SE','SW','OF','TO','FROM']);
+      const skip = new Set(['N', 'S', 'E', 'W', 'NE', 'NW', 'SE', 'SW', 'OF', 'TO', 'FROM']);
       return s.split(/[\s\/]+/)
         .map(t => t.replace(/[.,;]+$/, '').trim())
         .filter(t => t && !skip.has(t.toUpperCase()));
     }
 
-    function signedDist(pt, a, b) { return (b[0]-a[0])*(pt[1]-a[1]) - (b[1]-a[1])*(pt[0]-a[0]); }
+    function signedDist(pt, a, b) { return (b[0] - a[0]) * (pt[1] - a[1]) - (b[1] - a[1]) * (pt[0] - a[0]); }
 
+    // Check if point is on a compass side of a polyline
     function onCompassSide(pt, line, dir) {
       if (!line || line.length < 2) return false;
-      const [a, b] = [line[0], line[line.length - 1]];
+      
+      // Find the closest segment of the polyline to the point
+      let minDist = Infinity;
+      let closestSegIdx = 0;
+      
+      for (let i = 0; i < line.length - 1; i++) {
+        const d = distToSeg(pt, line[i], line[i + 1]);
+        if (d < minDist) {
+          minDist = d;
+          closestSegIdx = i;
+        }
+      }
+      
+      const a = line[closestSegIdx];
+      const b = line[closestSegIdx + 1];
+      
+      // Calculate midpoint of the closest segment as reference
+      const midX = (a[0] + b[0]) / 2;
+      const midY = (a[1] + b[1]) / 2;
+      
+      // Calculate offset from the segment's midpoint
+      const dLon = pt[0] - midX;
+      const dLat = pt[1] - midY;
+      
+      // Use signed distance from segment for left/right determination
       const sd = signedDist(pt, a, b);
-      const dx = b[0] - a[0], dy = b[1] - a[1];
+      
+      // Calculate segment direction vector
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
       const len = Math.hypot(dx, dy);
       if (len === 0) return false;
-      const nx = dx / len, ny = dy / len;
-      const lx = -ny, ly = nx;
-
-      const cv = { N:[0,1], S:[0,-1], E:[1,0], W:[-1,0], NE:[.707,.707], NW:[-.707,.707], SE:[.707,-.707], SW:[-.707,-.707] }[dir];
+      
+      // Normalized direction and perpendicular
+      const dirX = dx / len;
+      const dirY = dy / len;
+      const perpX = -dirY; // Perpendicular pointing "left" of line direction
+      const perpY = dirX;
+      
+      // Compass direction vectors (in lon/lat space: E is +lon, N is +lat)
+      const compassVectors = {
+        'N': [0, 1],
+        'S': [0, -1],
+        'E': [1, 0],
+        'W': [-1, 0],
+        'NE': [0.707, 0.707],
+        'NW': [-0.707, 0.707],
+        'SE': [0.707, -0.707],
+        'SW': [-0.707, -0.707]
+      };
+      
+      const cv = compassVectors[dir];
       if (!cv) return false;
-
-      const dot = lx * cv[0] + ly * cv[1];
-      if (dot > 0.1) return sd > 0;
-      if (dot < -0.1) return sd < 0;
-
-      const cx = (a[0] + b[0]) / 2, cy = (a[1] + b[1]) / 2;
-      const dLon = pt[0] - cx, dLat = pt[1] - cy;
-
+      
+      // Determine which side of the line the compass direction points to
+      const dotPerp = perpX * cv[0] + perpY * cv[1];
+      
+      // If the compass direction aligns with the perpendicular, use signed distance
+      if (Math.abs(dotPerp) > 0.3) {
+        return dotPerp > 0 ? sd > 0 : sd < 0;
+      }
+      
+      // For directions more parallel to the line, use direct compass comparison
       switch (dir) {
         case 'N': return dLat > 0;
         case 'S': return dLat < 0;
         case 'E': return dLon > 0;
         case 'W': return dLon < 0;
-        case 'NE': return dLat > 0 && dLon > 0;
-        case 'NW': return dLat > 0 && dLon < 0;
-        case 'SE': return dLat < 0 && dLon > 0;
-        case 'SW': return dLat < 0 && dLon < 0;
+        case 'NE': return dLat > 0 || dLon > 0;
+        case 'NW': return dLat > 0 || dLon < 0;
+        case 'SE': return dLat < 0 || dLon > 0;
+        case 'SW': return dLat < 0 || dLon < 0;
       }
       return false;
     }
 
     function between(pt, l1, l2) {
       if (!l1 || l1.length < 2 || !l2 || l2.length < 2) return false;
-      const d1 = signedDist(pt, l1[0], l1[l1.length - 1]);
-      const d2 = signedDist(pt, l2[0], l2[l2.length - 1]);
-      if (Math.abs(d1) < 0.01 || Math.abs(d2) < 0.01) return true;
-      return (d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0);
+      
+      // Find which side of a polyline a point is on
+      // by finding the closest segment and checking signed distance to that segment
+      function polylineSide(pt, polyline) {
+        let minDist = Infinity;
+        let closestSegIdx = 0;
+        
+        for (let i = 0; i < polyline.length - 1; i++) {
+          const d = distToSeg(pt, polyline[i], polyline[i + 1]);
+          if (d < minDist) {
+            minDist = d;
+            closestSegIdx = i;
+          }
+        }
+        
+        return signedDist(pt, polyline[closestSegIdx], polyline[closestSegIdx + 1]);
+      }
+      
+      // Use a point from the middle of l2 as reference for "toward l2" direction
+      const midIdxL2 = Math.floor(l2.length / 2);
+      const refPointL2 = l2[midIdxL2];
+      const l2SideOfL1 = polylineSide(refPointL2, l1);
+      
+      // Use a point from the middle of l1 as reference for "toward l1" direction
+      const midIdxL1 = Math.floor(l1.length / 2);
+      const refPointL1 = l1[midIdxL1];
+      const l1SideOfL2 = polylineSide(refPointL1, l2);
+      
+      // Check which side our test point is on for each polyline
+      const ptSideOfL1 = polylineSide(pt, l1);
+      const ptSideOfL2 = polylineSide(pt, l2);
+      
+      // Point is between if it's on the l2-facing side of l1 AND on the l1-facing side of l2
+      const onL2SideOfL1 = (ptSideOfL1 > 0) === (l2SideOfL1 > 0) || Math.abs(ptSideOfL1) < 0.001;
+      const onL1SideOfL2 = (ptSideOfL2 > 0) === (l1SideOfL2 > 0) || Math.abs(ptSideOfL2) < 0.001;
+      
+      return onL2SideOfL1 && onL1SideOfL2;
     }
 
     function samplePts(ring, n = 100) {
@@ -516,20 +656,50 @@
       return [sx / pts.length, sy / pts.length];
     }
 
+    // Find the best label position within a zone
+    // Use median coordinates for robustness with irregular/strip-shaped zones
+    function findBestZoneLabel(zone, ring) {
+      if (!zone || zone.length === 0) return null;
+      if (zone.length === 1) return zone[0];
+      
+      // Sort coordinates to find medians
+      const xs = zone.map(p => p[0]).sort((a, b) => a - b);
+      const ys = zone.map(p => p[1]).sort((a, b) => a - b);
+      
+      const midIdx = Math.floor(zone.length / 2);
+      const medianX = xs[midIdx];
+      const medianY = ys[midIdx];
+      
+      // Find the zone point closest to the median point
+      // This guarantees we return a point that's actually in the zone
+      let best = zone[0];
+      let minDist = Infinity;
+      
+      for (const pt of zone) {
+        const d = Math.hypot(pt[0] - medianX, pt[1] - medianY);
+        if (d < minDist) {
+          minDist = d;
+          best = pt;
+        }
+      }
+      
+      return best;
+    }
+
     function lineInt(a, b, c, d) {
-      const [x1,y1,x2,y2,x3,y3,x4,y4] = [a[0],a[1],b[0],b[1],c[0],c[1],d[0],d[1]];
-      const den = (x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+      const [x1, y1, x2, y2, x3, y3, x4, y4] = [a[0], a[1], b[0], b[1], c[0], c[1], d[0], d[1]];
+      const den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
       if (Math.abs(den) < 1e-10) return null;
-      const t = ((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/den;
-      const u = -((x1-x2)*(y1-y3)-(y1-y2)*(x1-x3))/den;
-      return (t>=0&&t<=1&&u>=0&&u<=1) ? [x1+t*(x2-x1),y1+t*(y2-y1)] : null;
+      const t = ((x1 - x3) * (y3 - y4) - (y1 - y3) * (x3 - x4)) / den;
+      const u = -((x1 - x2) * (y1 - y3) - (y1 - y2) * (x1 - x3)) / den;
+      return (t >= 0 && t <= 1 && u >= 0 && u <= 1) ? [x1 + t * (x2 - x1), y1 + t * (y2 - y1)] : null;
     }
 
     function extendToBnd(pt, dir, ring) {
       const far = [pt[0] + dir[0] * 1000, pt[1] + dir[1] * 1000];
       let best = null, minD = Infinity;
       for (let i = 0; i < ring.length - 1; i++) {
-        const h = lineInt(pt, far, ring[i], ring[i+1]);
+        const h = lineInt(pt, far, ring[i], ring[i + 1]);
         if (h) {
           const d = Math.hypot(h[0] - pt[0], h[1] - pt[1]);
           if (d > 0.0001 && d < minD) { minD = d; best = h; }
@@ -542,13 +712,13 @@
       if (!coords || coords.length < 2) return coords;
       const fd = [coords[0][0] - coords[1][0], coords[0][1] - coords[1][1]];
       const fl = Math.hypot(fd[0], fd[1]);
-      const fn = fl > 0 ? [fd[0]/fl, fd[1]/fl] : [0,0];
+      const fn = fl > 0 ? [fd[0] / fl, fd[1] / fl] : [0, 0];
       const sb = extendToBnd(coords[0], fn, ring);
 
       const li = coords.length - 1;
-      const ld = [coords[li][0] - coords[li-1][0], coords[li][1] - coords[li-1][1]];
+      const ld = [coords[li][0] - coords[li - 1][0], coords[li][1] - coords[li - 1][1]];
       const ll = Math.hypot(ld[0], ld[1]);
-      const ln = ll > 0 ? [ld[0]/ll, ld[1]/ll] : [0,0];
+      const ln = ll > 0 ? [ld[0] / ll, ld[1] / ll] : [0, 0];
       const eb = extendToBnd(coords[li], ln, ring);
 
       return [...(sb ? [sb] : []), ...coords, ...(eb ? [eb] : [])];
@@ -567,10 +737,10 @@
           const cr = [];
           for (let j = 0; j < ring.length - 1; j++) {
             const h = lineInt(p1, p2, ring[j], ring[j + 1]);
-            if (h) cr.push({ pt: h, d: Math.hypot(h[0]-p1[0], h[1]-p1[1]) });
+            if (h) cr.push({ pt: h, d: Math.hypot(h[0] - p1[0], h[1] - p1[1]) });
           }
           if (cr.length >= 2) {
-            cr.sort((a,b) => a.d - b.d);
+            cr.sort((a, b) => a.d - b.d);
             dashed.push([p1, cr[0].pt]);
             solid.push([cr[0].pt, cr[1].pt]);
             dashed.push([cr[1].pt, p2]);
@@ -651,7 +821,7 @@
           return d;
         });
 
-        const samples = samplePts(ring, 150);
+        const samples = samplePts(ring, 200);
 
         rules.forEach((r, i) => {
           if (!r.qnh) return;
@@ -675,14 +845,16 @@
           }
 
           if (zone.length) {
-            const c = centroid(zone);
+            // Use improved label positioning that ensures label is within the zone
+            const labelPos = findBestZoneLabel(zone, ring);
+            
             lblF.push({
               type: 'Feature',
               properties: {
                 qnh: r.qnh,
                 area_num: code.slice(5) // AREA-80 -> 80
               },
-              geometry: { type: 'Point', coordinates: pointInPoly(c, ring) ? c : zone[0] }
+              geometry: { type: 'Point', coordinates: labelPos }
             });
           }
         });
@@ -701,7 +873,7 @@
 
       upd('split-dash', { type: 'FeatureCollection', features: dashF }, {
         id: 'split-dash', type: 'line', source: 'split-dash',
-        paint: { 'line-color': '#1a8f2a', 'line-width': 1.5, 'line-dasharray': [3,3] }
+        paint: { 'line-color': '#1a8f2a', 'line-width': 1.5, 'line-dasharray': [3, 3] }
       });
 
       // Split QNH labels, green
@@ -722,7 +894,7 @@
         }
       });
 
-      // ✅ Area label under split QNH, red (only for splits)
+      // Area label under split QNH, red (only for splits)
       if (!map.getLayer('split-lbl-area')) {
         map.addLayer({
           id: 'split-lbl-area',
@@ -769,4 +941,5 @@
     }
   </script>
 </body>
+
 </html>

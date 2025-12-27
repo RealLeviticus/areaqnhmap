@@ -23,7 +23,9 @@
       --warning: #bf8700;
     }
 
-    * { box-sizing: border-box; }
+    * {
+      box-sizing: border-box;
+    }
 
     body {
       margin: 0;
@@ -81,14 +83,27 @@
       animation: pulse 2s infinite;
     }
 
-    .status-dot.error { background: var(--error); animation: none; }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+    .status-dot.error {
+      background: var(--error);
+      animation: none;
     }
 
-    .nav-links { display: flex; gap: 16px; }
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1;
+      }
+
+      50% {
+        opacity: 0.5;
+      }
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 16px;
+    }
 
     .nav-links a {
       color: var(--accent);
@@ -132,7 +147,9 @@
     }
 
     /* We no longer need featured sizing differences – make them all equal */
-    .region-card.featured { grid-column: auto; }
+    .region-card.featured {
+      grid-column: auto;
+    }
 
     .region-header {
       padding: 12px 16px;
@@ -150,7 +167,10 @@
       gap: 2px;
     }
 
-    .region-title { font-weight: 600; font-size: 1rem; }
+    .region-title {
+      font-weight: 600;
+      font-size: 1rem;
+    }
 
     .region-validity {
       font-size: 0.8rem;
@@ -171,7 +191,8 @@
     .region-image-container {
       position: relative;
       background: #ffffff;
-      min-height: 300px;              /* placeholder height before load */
+      min-height: 300px;
+      /* placeholder height before load */
       overflow: hidden;
     }
 
@@ -186,7 +207,9 @@
       background: #ffffff;
     }
 
-    .region-image.loaded { opacity: 1; }
+    .region-image.loaded {
+      opacity: 1;
+    }
 
     .loading-spinner {
       position: absolute;
@@ -198,9 +221,15 @@
       animation: spin 1s linear infinite;
     }
 
-    .loading-spinner.hidden { display: none; }
+    .loading-spinner.hidden {
+      display: none;
+    }
 
-    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
 
     .error-message {
       position: absolute;
@@ -239,7 +268,9 @@
       padding: 16px;
     }
 
-    .modal-backdrop.visible { display: flex; }
+    .modal-backdrop.visible {
+      display: flex;
+    }
 
     .disclaimer-modal {
       background: var(--card-bg);
@@ -285,16 +316,31 @@
       background: #fff;
     }
 
-    footer a { color: var(--accent); }
+    footer a {
+      color: var(--accent);
+    }
 
     @media (max-width: 768px) {
-      .header-content { flex-direction: column; align-items: flex-start; }
-      main { padding: 16px; }
+      .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      main {
+        padding: 16px;
+      }
     }
 
     @media print {
-      header, footer { display: none; }
-      .region-card { break-inside: avoid; }
+
+      header,
+      footer {
+        display: none;
+      }
+
+      .region-card {
+        break-inside: avoid;
+      }
     }
   </style>
 </head>
