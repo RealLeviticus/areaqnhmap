@@ -2,7 +2,8 @@ name: Generate QNH Screenshots
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    # Every 15 minutes (avoid overlapping runs and cancels)
+    - cron: "*/15 * * * *"
 
   workflow_dispatch:
     inputs:
@@ -16,11 +17,13 @@ permissions:
 
 concurrency:
   group: qnh-screenshots
-  cancel-in-progress: true
+  # Do NOT cancel, let later runs wait instead of killing apt/puppeteer mid run
+  cancel-in-progress: false
 
 jobs:
   generate-screenshots:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repository
@@ -37,7 +40,7 @@ jobs:
         run: |
           npm install puppeteer
 
-      - name: Install system deps for Chromium and WebGL
+      - name: Install system deps for Chromium and WebGL (Ubuntu 24.04 safe)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -45,7 +48,6 @@ jobs:
             libgbm1 \
             libnss3 \
             libxss1 \
-            libasound2t64 \
             libatk-bridge2.0-0 \
             libgtk-3-0 \
             libxkbcommon0 \
@@ -54,12 +56,14 @@ jobs:
             libgl1-mesa-dri \
             mesa-utils
 
+          # Ubuntu 24.04 uses libasound2t64, older runners use libasound2
+          sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
+
       - name: Check for QNH data changes
         id: check-changes
         shell: bash
         run: |
           set -e
-
           mkdir -p .qnh-cache
 
           CURRENT_ISSUED=$(curl -s 'https://areaqnh.therealleviticus.workers.dev/' | grep -oP 'Issued:\s*\K[^<\n]+' | head -1 || true)
@@ -87,7 +91,7 @@ jobs:
             echo "$CURRENT_ISSUED" > .qnh-cache/last_issued.txt
           fi
 
-      - name: Generate screenshots
+      - name: Generate screenshots (Puppeteer + Xvfb + SwiftShader)
         if: steps.check-changes.outputs.changed == 'true'
         env:
           DISPLAY: ":99"
@@ -120,7 +124,8 @@ jobs:
             if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
             const browser = await puppeteer.launch({
-              headless: false, // headful + Xvfb is most reliable for WebGL on CI
+              // Headful + Xvfb is most reliable for WebGL on CI
+              headless: false,
               args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
@@ -132,7 +137,7 @@ jobs:
                 '--use-gl=angle',
                 '--use-angle=swiftshader',
 
-                // reduce weirdness on some runners
+                // Reduce odd renderer paths on runners
                 '--disable-features=Vulkan',
                 '--disable-features=UseSkiaRenderer',
               ]
@@ -150,6 +155,7 @@ jobs:
                 if (res.status() >= 400) console.log(`[HTTP ${res.status()}] ${res.url()}`);
               });
 
+              // Capture the map instance even if your site does not attach it to window.map
               await page.evaluateOnNewDocument(() => {
                 let internal;
                 Object.defineProperty(window, 'maplibregl', {
@@ -177,11 +183,14 @@ jobs:
 
               await page.waitForSelector('#map', { timeout: 120000 });
 
+              // Wait for map instance to exist and load
               await page.waitForFunction(() => window.__map && typeof window.__map.loaded === 'function', { timeout: 120000 });
               await page.waitForFunction(() => window.__map.loaded(), { timeout: 120000 });
 
+              // Ensure the canvas exists
               await page.waitForSelector('#map canvas', { timeout: 120000 });
 
+              // Force labels to render even if they would normally collide and hide
               await page.evaluate(() => {
                 const m = window.__map;
                 if (!m) return;
