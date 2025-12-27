@@ -115,6 +115,8 @@
         zoom: 4,
         preserveDrawingBuffer: true
       });
+      // Expose map globally so automation (Puppeteer) can wait on it
+      window.map = map;
       map.addControl(new maplibregl.NavigationControl(), 'top-left');
       map.on('load', async () => { await loadAreas(); await fetchNav(); await fetchQNH(); setInterval(fetchQNH, 300000); });
     }
