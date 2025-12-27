@@ -1,21 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Area QNH Static Maps</title>
   <meta name="description" content="Static Area QNH maps for Australian aviation" />
   <meta http-equiv="refresh" content="180">
+
   <style>
     :root {
-      --bg: #0d1117;
-      --card-bg: #161b22;
-      --border: #30363d;
-      --text: #e6edf3;
-      --text-muted: #8b949e;
-      --accent: #58a6ff;
-      --success: #3fb950;
-      --error: #f85149;
+      /* Match the light interactive map */
+      --bg: #ffffff;
+      --card-bg: #ffffff;
+      --border: #d0d0d0;
+      --text: #111111;
+      --text-muted: #666666;
+      --accent: #1f6feb;
+
+      --success: #2ea043;
+      --error: #d1242f;
+      --warning: #bf8700;
     }
 
     * { box-sizing: border-box; }
@@ -76,17 +81,14 @@
       animation: pulse 2s infinite;
     }
 
-    .status-dot.error { background: var(--error); }
+    .status-dot.error { background: var(--error); animation: none; }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
 
-    .nav-links {
-      display: flex;
-      gap: 16px;
-    }
+    .nav-links { display: flex; gap: 16px; }
 
     .nav-links a {
       color: var(--accent);
@@ -94,13 +96,14 @@
       font-size: 0.9rem;
       padding: 6px 12px;
       border: 1px solid var(--accent);
-      border-radius: 4px;
+      border-radius: 6px;
       transition: all 0.2s;
+      background: #fff;
     }
 
     .nav-links a:hover {
       background: var(--accent);
-      color: var(--bg);
+      color: #fff;
     }
 
     main {
@@ -110,8 +113,8 @@
     }
 
     .region-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      display: flex;
+      flex-direction: column;
       gap: 24px;
     }
 
@@ -125,51 +128,51 @@
 
     .region-card:hover {
       transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
     }
 
-    .region-card.featured { grid-column: 1 / -1; }
+    /* We no longer need featured sizing differences – make them all equal */
+    .region-card.featured { grid-column: auto; }
 
     .region-header {
       padding: 12px 16px;
-      background: linear-gradient(135deg, #1c2128 0%, #161b22 100%);
+      background: #f7f7f7;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      gap: 12px;
     }
 
-    .region-title {
-      font-weight: 600;
-      font-size: 1rem;
-    }
+    .region-title { font-weight: 600; font-size: 1rem; }
 
     .region-code {
       background: var(--accent);
-      color: var(--bg);
+      color: #fff;
       padding: 2px 8px;
-      border-radius: 4px;
+      border-radius: 6px;
       font-size: 0.75rem;
       font-weight: 600;
+      flex-shrink: 0;
     }
 
+    /* ✅ Force every image container to same height as AU used to be */
     .region-image-container {
       position: relative;
-      background: #0d1117;
-      min-height: 300px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      background: #ffffff;
+      min-height: 300px;              /* placeholder height before load */
+      overflow: hidden;
     }
 
-    .region-card.featured .region-image-container { min-height: 500px; }
-
+    /* ✅ Make image fit inside container without stretching */
     .region-image {
       width: 100%;
       height: auto;
+      object-fit: contain;
       display: block;
       opacity: 0;
-      transition: opacity 0.3s;
+      transition: opacity 0.25s;
+      background: #ffffff;
     }
 
     .region-image.loaded { opacity: 1; }
@@ -199,13 +202,13 @@
       width: 48px;
       height: 48px;
       margin-bottom: 12px;
-      opacity: 0.5;
+      opacity: 0.7;
       stroke: var(--error);
     }
 
     .region-footer {
       padding: 10px 16px;
-      background: #1c2128;
+      background: #fafafa;
       border-top: 1px solid var(--border);
       display: flex;
       justify-content: space-between;
@@ -214,23 +217,6 @@
       color: var(--text-muted);
     }
 
-    .download-btn {
-      background: var(--accent);
-      color: var(--bg);
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
-      cursor: pointer;
-      font-size: 0.8rem;
-      text-decoration: none;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-weight: 500;
-    }
-
-    .download-btn:hover { filter: brightness(1.1); }
-
     footer {
       text-align: center;
       padding: 24px;
@@ -238,22 +224,23 @@
       font-size: 0.85rem;
       border-top: 1px solid var(--border);
       margin-top: 24px;
+      background: #fff;
     }
 
     footer a { color: var(--accent); }
 
     @media (max-width: 768px) {
-      .region-grid { grid-template-columns: 1fr; }
       .header-content { flex-direction: column; align-items: flex-start; }
       main { padding: 16px; }
     }
 
     @media print {
-      header, footer, .download-btn { display: none; }
+      header, footer { display: none; }
       .region-card { break-inside: avoid; }
     }
   </style>
 </head>
+
 <body>
   <header>
     <div class="header-content">
@@ -274,7 +261,7 @@
 
   <main>
     <div class="region-grid" id="regionGrid">
-      <div class="region-card featured" data-region="AU">
+      <div class="region-card" data-region="AU">
         <div class="region-header">
           <span class="region-title">Australia (Full)</span>
           <span class="region-code">AU</span>
@@ -286,12 +273,7 @@
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-AU">Loading...</span>
-          <a class="download-btn" id="download-AU" download="qnh-australia.png">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-            </svg>
-            Download
-          </a>
+          <span></span>
         </div>
       </div>
 
@@ -307,12 +289,7 @@
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-NE">Loading...</span>
-          <a class="download-btn" id="download-NE" download="qnh-northeast.png">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-            </svg>
-            Download
-          </a>
+          <span></span>
         </div>
       </div>
 
@@ -328,12 +305,7 @@
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-SE">Loading...</span>
-          <a class="download-btn" id="download-SE" download="qnh-southeast.png">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-            </svg>
-            Download
-          </a>
+          <span></span>
         </div>
       </div>
 
@@ -349,12 +321,7 @@
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-NW">Loading...</span>
-          <a class="download-btn" id="download-NW" download="qnh-northwest.png">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-            </svg>
-            Download
-          </a>
+          <span></span>
         </div>
       </div>
 
@@ -370,12 +337,7 @@
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-SW">Loading...</span>
-          <a class="download-btn" id="download-SW" download="qnh-southwest.png">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-            </svg>
-            Download
-          </a>
+          <span></span>
         </div>
       </div>
     </div>
@@ -392,12 +354,9 @@
   </footer>
 
   <script>
-    // IMPORTANT:
-    // If you use fetch() against R2/Worker without CORS headers, it will fail.
-    // This page now loads images directly (no fetch), so it works without CORS.
-
+    // Load images directly (no fetch), avoids CORS issues
     const R2_BASE_URL_RAW = 'https://qnh-images.therealleviticus.workers.dev/';
-    const R2_BASE_URL = R2_BASE_URL_RAW.replace(/\/+$/, ''); // trim trailing slashes
+    const R2_BASE_URL = R2_BASE_URL_RAW.replace(/\/+$/, '');
 
     const regions = ['AU', 'NE', 'SE', 'NW', 'SW'];
     let loadedCount = 0;
@@ -461,7 +420,6 @@
       const spinner = document.getElementById(`spinner-${region}`);
       const errorDiv = document.getElementById(`error-${region}`);
       const timeSpan = document.getElementById(`time-${region}`);
-      const downloadBtn = document.getElementById(`download-${region}`);
 
       img.classList.remove('loaded');
       if (spinner) spinner.classList.remove('hidden');
@@ -472,18 +430,13 @@
       img.onload = () => {
         img.classList.add('loaded');
         if (spinner) spinner.classList.add('hidden');
-
         if (timeSpan) timeSpan.textContent = `Loaded: ${formatTimestamp(new Date())}`;
-
-        if (downloadBtn) downloadBtn.href = imageUrl;
 
         loadedCount++;
         updateStatus();
       };
 
-      img.onerror = () => {
-        showError(region, 'Image not available');
-      };
+      img.onerror = () => showError(region, 'Image not available');
 
       img.src = imageUrl;
     }
@@ -508,11 +461,12 @@
         if (errorDiv) errorDiv.style.display = 'none';
       });
 
-      regions.forEach(region => loadImage(region));
+      regions.forEach(loadImage);
     }
 
     document.addEventListener('DOMContentLoaded', refreshImages);
     window.refreshImages = refreshImages;
   </script>
 </body>
+
 </html>
