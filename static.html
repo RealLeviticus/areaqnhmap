@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Area QNH Static Maps</title>
+  <meta name="description" content="Static Area QNH maps for Australian aviation" />
+  <meta http-equiv="refresh" content="180"> <!-- Auto-refresh every 3 minutes -->
+  <style>
+    :root {
+      --bg: #f5f5f5;
+      --card-bg: #ffffff;
+      --border: #e0e0e0;
+      --text: #333;
+      --text-muted: #666;
+      --accent: #0066cc;
+      --success: #28a745;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    header {
+      background: var(--card-bg);
+      border-bottom: 1px solid var(--border);
+      padding: 16px 24px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+
+    .header-content {
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      margin-top: 4px;
+    }
+
+    .status {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--success);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 16px;
+    }
+
+    .nav-links a {
+      color: var(--accent);
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+
+    .nav-links a:hover {
+      text-decoration: underline;
+    }
+
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .region-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+      gap: 24px;
+    }
+
+    .region-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+
+    .region-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+
+    .region-card.featured {
+      grid-column: 1 / -1;
+    }
+
+    .region-header {
+      padding: 12px 16px;
+      background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .region-title {
+      font-weight: 600;
+      font-size: 1rem;
+    }
+
+    .region-code {
+      background: var(--accent);
+      color: white;
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .region-image-container {
+      position: relative;
+      background: #f0f0f0;
+      min-height: 300px;
+    }
+
+    .region-card.featured .region-image-container {
+      min-height: 500px;
+    }
+
+    .region-image {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .region-image.loading {
+      opacity: 0;
+    }
+
+    .loading-spinner {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 40px;
+      height: 40px;
+      border: 3px solid var(--border);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    .error-message {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      color: var(--text-muted);
+      padding: 20px;
+    }
+
+    .error-message svg {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 12px;
+      opacity: 0.5;
+    }
+
+    .region-footer {
+      padding: 10px 16px;
+      background: #fafafa;
+      border-top: 1px solid var(--border);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .download-btn {
+      background: var(--accent);
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.8rem;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .download-btn:hover {
+      background: #0052a3;
+    }
+
+    footer {
+      text-align: center;
+      padding: 24px;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      margin-top: 24px;
+    }
+
+    footer a {
+      color: var(--accent);
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .region-grid {
+        grid-template-columns: 1fr;
+      }
+      
+      .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      main {
+        padding: 16px;
+      }
+    }
+
+    /* Print styles */
+    @media print {
+      header, footer, .download-btn {
+        display: none;
+      }
+      
+      .region-card {
+        break-inside: avoid;
+        page-break-inside: avoid;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-content">
+      <div>
+        <h1>Area QNH Static Maps</h1>
+        <p class="subtitle">Australian aviation altimeter setting regions</p>
+      </div>
+      <div class="status">
+        <span class="status-dot"></span>
+        <span id="lastUpdate">Loading...</span>
+      </div>
+      <nav class="nav-links">
+        <a href="../">← Interactive Map</a>
+        <a href="#" onclick="refreshImages(); return false;">↻ Refresh</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="region-grid" id="regionGrid">
+      <!-- Australia Full -->
+      <div class="region-card featured" data-region="AU">
+        <div class="region-header">
+          <span class="region-title">Australia (Full)</span>
+          <span class="region-code">AU</span>
+        </div>
+        <div class="region-image-container">
+          <div class="loading-spinner" id="spinner-AU"></div>
+          <img class="region-image loading" id="img-AU" alt="Australia QNH Map" />
+        </div>
+        <div class="region-footer">
+          <span class="timestamp" id="time-AU">Loading...</span>
+          <a class="download-btn" id="download-AU" download="qnh-australia.png">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Download
+          </a>
+        </div>
+      </div>
+
+      <!-- Northeast -->
+      <div class="region-card" data-region="NE">
+        <div class="region-header">
+          <span class="region-title">Northeast (QLD / North NSW)</span>
+          <span class="region-code">NE</span>
+        </div>
+        <div class="region-image-container">
+          <div class="loading-spinner" id="spinner-NE"></div>
+          <img class="region-image loading" id="img-NE" alt="Northeast QNH Map" />
+        </div>
+        <div class="region-footer">
+          <span class="timestamp" id="time-NE">Loading...</span>
+          <a class="download-btn" id="download-NE" download="qnh-northeast.png">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Download
+          </a>
+        </div>
+      </div>
+
+      <!-- Southeast -->
+      <div class="region-card" data-region="SE">
+        <div class="region-header">
+          <span class="region-title">Southeast (VIC / TAS / South NSW)</span>
+          <span class="region-code">SE</span>
+        </div>
+        <div class="region-image-container">
+          <div class="loading-spinner" id="spinner-SE"></div>
+          <img class="region-image loading" id="img-SE" alt="Southeast QNH Map" />
+        </div>
+        <div class="region-footer">
+          <span class="timestamp" id="time-SE">Loading...</span>
+          <a class="download-btn" id="download-SE" download="qnh-southeast.png">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Download
+          </a>
+        </div>
+      </div>
+
+      <!-- Northwest -->
+      <div class="region-card" data-region="NW">
+        <div class="region-header">
+          <span class="region-title">Northwest (NT / North WA)</span>
+          <span class="region-code">NW</span>
+        </div>
+        <div class="region-image-container">
+          <div class="loading-spinner" id="spinner-NW"></div>
+          <img class="region-image loading" id="img-NW" alt="Northwest QNH Map" />
+        </div>
+        <div class="region-footer">
+          <span class="timestamp" id="time-NW">Loading...</span>
+          <a class="download-btn" id="download-NW" download="qnh-northwest.png">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Download
+          </a>
+        </div>
+      </div>
+
+      <!-- Southwest -->
+      <div class="region-card" data-region="SW">
+        <div class="region-header">
+          <span class="region-title">Southwest (SA / South WA)</span>
+          <span class="region-code">SW</span>
+        </div>
+        <div class="region-image-container">
+          <div class="loading-spinner" id="spinner-SW"></div>
+          <img class="region-image loading" id="img-SW" alt="Southwest QNH Map" />
+        </div>
+        <div class="region-footer">
+          <span class="timestamp" id="time-SW">Loading...</span>
+          <a class="download-btn" id="download-SW" download="qnh-southwest.png">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+            </svg>
+            Download
+          </a>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer>
+    <p>
+      Data sourced from Bureau of Meteorology. 
+      Images auto-refresh every 3 minutes.
+      <br>
+      <a href="../">View Interactive Map</a> | 
+      Built for Australian aviation.
+    </p>
+  </footer>
+
+  <script>
+    // Configuration - Update this URL to your R2 public bucket or worker endpoint
+    const R2_BASE_URL = 'https://imageupload.therealleviticus.workers.dev';
+    
+    const regions = ['AU', 'NE', 'SE', 'NW', 'SW'];
+
+    function formatTimestamp(date) {
+      return date.toLocaleString('en-AU', {
+        timeZone: 'UTC',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZoneName: 'short'
+      });
+    }
+
+    function showError(region, message) {
+      const container = document.querySelector(`[data-region="${region}"] .region-image-container`);
+      const spinner = document.getElementById(`spinner-${region}`);
+      
+      if (spinner) spinner.style.display = 'none';
+      
+      // Check if error message already exists
+      let errorDiv = container.querySelector('.error-message');
+      if (!errorDiv) {
+        errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        container.appendChild(errorDiv);
+      }
+      
+      errorDiv.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <p>${message}</p>
+      `;
+    }
+
+    async function loadImage(region) {
+      const img = document.getElementById(`img-${region}`);
+      const spinner = document.getElementById(`spinner-${region}`);
+      const timeSpan = document.getElementById(`time-${region}`);
+      const downloadBtn = document.getElementById(`download-${region}`);
+      
+      // Add cache-busting timestamp
+      const imageUrl = `${R2_BASE_URL}/qnh-${region.toLowerCase()}.png?t=${Date.now()}`;
+      
+      try {
+        // First, try to fetch to check if image exists
+        const response = await fetch(imageUrl, { method: 'HEAD' });
+        
+        if (!response.ok) {
+          throw new Error('Image not available');
+        }
+
+        // Load the image
+        img.onload = () => {
+          img.classList.remove('loading');
+          if (spinner) spinner.style.display = 'none';
+          
+          // Update timestamp
+          const lastModified = response.headers.get('last-modified');
+          if (lastModified) {
+            timeSpan.textContent = `Updated: ${formatTimestamp(new Date(lastModified))}`;
+          } else {
+            timeSpan.textContent = `Loaded: ${formatTimestamp(new Date())}`;
+          }
+          
+          // Update download link
+          downloadBtn.href = imageUrl;
+        };
+
+        img.onerror = () => {
+          showError(region, 'Failed to load image');
+        };
+
+        img.src = imageUrl;
+        
+      } catch (error) {
+        console.error(`Failed to load ${region}:`, error);
+        showError(region, 'Image not available yet');
+      }
+    }
+
+    function refreshImages() {
+      // Reset all images
+      regions.forEach(region => {
+        const img = document.getElementById(`img-${region}`);
+        const spinner = document.getElementById(`spinner-${region}`);
+        const errorDiv = document.querySelector(`[data-region="${region}"] .error-message`);
+        
+        img.classList.add('loading');
+        img.src = '';
+        if (spinner) spinner.style.display = 'block';
+        if (errorDiv) errorDiv.remove();
+      });
+
+      // Reload all images
+      regions.forEach(region => loadImage(region));
+      
+      // Update status
+      document.getElementById('lastUpdate').textContent = `Last check: ${formatTimestamp(new Date())}`;
+    }
+
+    // Initial load
+    document.addEventListener('DOMContentLoaded', () => {
+      refreshImages();
+      
+      // Also update timestamp in header
+      document.getElementById('lastUpdate').textContent = `Last check: ${formatTimestamp(new Date())}`;
+    });
+
+    // Manual refresh is available via the Refresh link in nav
+    window.refreshImages = refreshImages;
+  </script>
+</body>
+</html>

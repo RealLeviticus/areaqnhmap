@@ -191,6 +191,8 @@
         <button class="export-btn" onclick="exportRegion('NW')">Northwest</button>
         <button class="export-btn" onclick="exportRegion('SW')">Southwest</button>
         <button class="export-btn" onclick="exportRegion('CURRENT')">Current View</button>
+        <hr style="margin: 8px 0; border: none; border-top: 1px solid #ddd;">
+        <button class="export-btn" onclick="manualExportAllToR2()" style="background: #0066cc;">Upload All to R2</button>
       </div>
       <div class="legend">
         <h4>Legend</h4>
@@ -251,6 +253,8 @@
     let navPointMap = {};
     let navIndexPromise = null;
     let map = null;
+    let mapFullyReady = false;
+    let lastIssuedTimestamp = null; // Track last issued timestamp for change detection
 
     function initializeMap() {
       try {
@@ -280,27 +284,23 @@
 
         map.on('error', (e) => {
           console.error('Map error:', e);
-          const { resourceType, sourceId } = e || {};
-          if (resourceType === 'glyphs') {
-            showWarning('Map labels may be missing due to font loading issues.');
-          }
-          if (resourceType === 'tile' && sourceId === 'osm') {
-            showWarning('Base map tiles failed to load. Check network connectivity.');
-          }
         });
 
-        map.on('load', () => {
+        map.on('load', async () => {
           console.log('Map loaded successfully');
-          loadAreas();
-          ensureNavIndex();
-          startQNHLoop();
+          await loadAreas();
+          await ensureNavIndex();
+          await fetchAndDrawQNH();
+          
+          // Wait for map to be fully idle before marking as ready
+          map.once('idle', () => {
+            console.log('Map fully idle and ready');
+            mapFullyReady = true;
+          });
+          
+          // Start the QNH check loop (checks every minute for changes)
+          startQNHCheckLoop();
         });
-
-        setTimeout(() => {
-          if (!map || !map.loaded()) {
-            showWarning('Map is taking longer than expected to load.');
-          }
-        }, 10000);
 
       } catch (error) {
         console.error('Failed to initialize map:', error);
@@ -340,9 +340,6 @@
       fitToAreas(geojson);
     }
 
-    // ============================================================
-    // FIXED: Improved label position calculation using pole of inaccessibility
-    // ============================================================
     function findOptimalLabelPosition(ring, gridSize = 50) {
       if (!ring || ring.length < 3) return [0, 0];
 
@@ -370,7 +367,6 @@
 
           if (!pointInPolygon(point, ring)) continue;
 
-          // Find minimum distance to any edge
           let minDistToBoundary = Infinity;
           for (let k = 0; k < ring.length - 1; k++) {
             const dist = distanceToSegment(point, ring[k], ring[k + 1]);
@@ -385,7 +381,6 @@
       }
 
       if (!bestPoint) {
-        // Fallback to centroid
         return calculatePolygonCentroid(ring);
       }
 
@@ -415,9 +410,7 @@
           ? findOptimalLabelPosition(coords)
           : [0, 0];
 
-        // Verify label is inside polygon
         if (coords && !pointInPolygon(labelCoord, coords)) {
-          console.warn(`${areaCode}: Label outside polygon, using centroid`);
           labelCoord = calculatePolygonCentroid(coords);
         }
 
@@ -552,9 +545,42 @@
       }
     }
 
-    function startQNHLoop() {
-      fetchAndDrawQNH();
-      setInterval(fetchAndDrawQNH, 15 * 60 * 1000);
+    // Check for QNH updates every minute
+    function startQNHCheckLoop() {
+      setInterval(checkForQNHUpdate, 60 * 1000); // Check every minute
+    }
+
+    async function checkForQNHUpdate() {
+      try {
+        const res = await fetchWithTimeout(QNH_WORKER_URL + '?t=' + Date.now(), { cache: 'no-store' }, 30000);
+        if (!res.ok) return;
+        const raw = await res.text();
+        const text = sanitizeHTML(raw);
+        const parsed = parseQNHText(text);
+        
+        const newIssued = parsed.validIssued?.issued;
+        
+        if (newIssued && newIssued !== lastIssuedTimestamp) {
+          console.log(`QNH data changed! Old: ${lastIssuedTimestamp}, New: ${newIssued}`);
+          lastIssuedTimestamp = newIssued;
+          
+          // Update the map
+          areaQnhMap = parsed.areaQnhMap;
+          areaSplits = parsed.areaSplits;
+          applyAreaQnhToPolygons();
+          drawSplitLines();
+          
+          updateValidityDisplay(parsed);
+          showSuccess('New QNH data detected and loaded!');
+          
+          // Auto-export to R2 when data changes
+          if (mapFullyReady) {
+            setTimeout(() => autoExportAllToR2(), 2000);
+          }
+        }
+      } catch (err) {
+        console.error('QNH check failed:', err);
+      }
     }
 
     async function fetchAndDrawQNH() {
@@ -571,28 +597,31 @@
         
         areaQnhMap = parsed.areaQnhMap;
         areaSplits = parsed.areaSplits;
+        lastIssuedTimestamp = parsed.validIssued?.issued || null;
         
-        await ensureNavIndex();
         applyAreaQnhToPolygons();
         drawSplitLines();
 
-        const v = parsed.validIssued;
-        const areaCount = Object.keys(parsed.areaQnhMap || {}).length;
-        const totalAreas = areaGeoJSON?.features?.length || '?';
-        const splitCount = Object.keys(parsed.areaSplits || {}).length;
-        
-        validityBox.textContent = v
-          ? `Valid: ${v.valid} | Issued: ${v.issued} | Areas: ${areaCount}/${totalAreas}${splitCount ? ` (${splitCount} split)` : ''}`
-          : `Areas: ${areaCount}/${totalAreas}${splitCount ? ` (${splitCount} split)` : ''}`;
-          
-        showSuccess(`QNH data updated successfully (${areaCount} areas, ${splitCount} with splits)`);
+        updateValidityDisplay(parsed);
+        showSuccess(`QNH data loaded successfully`);
 
-        autoExportToR2();
       } catch (err) {
         console.error('Failed to fetch/parse QNH:', err);
         validityBox.textContent = 'Failed to fetch QNH data';
-        showWarning('QNH fetch failed - latest values unavailable. Will retry in 15 minutes.');
+        showWarning('QNH fetch failed - latest values unavailable.');
       }
+    }
+
+    function updateValidityDisplay(parsed) {
+      const validityBox = document.getElementById('validity');
+      const v = parsed.validIssued;
+      const areaCount = Object.keys(parsed.areaQnhMap || {}).length;
+      const totalAreas = areaGeoJSON?.features?.length || '?';
+      const splitCount = Object.keys(parsed.areaSplits || {}).length;
+      
+      validityBox.textContent = v
+        ? `Valid: ${v.valid} | Issued: ${v.issued} | Areas: ${areaCount}/${totalAreas}${splitCount ? ` (${splitCount} split)` : ''}`
+        : `Areas: ${areaCount}/${totalAreas}${splitCount ? ` (${splitCount} split)` : ''}`;
     }
 
     function sanitizeHTML(html) {
@@ -728,7 +757,7 @@
         return navPointMap;
       } catch (err) {
         console.error('Failed to load nav index:', err);
-        showWarning('Could not load navigation index - split line reference points may not display.');
+        showWarning('Could not load navigation index.');
         return navPointMap;
       }
     }
@@ -758,7 +787,6 @@
       if (!token) return null;
       const trimmed = token.trim();
       
-      // Try coordinate patterns first
       const patterns = [
         /^(\d{1,2})([NS])(\d{1,3})([EW])$/i,
         /^(\d{1,2})(\d{2})([NS])(\d{1,3})(\d{2})([EW])$/i
@@ -781,7 +809,6 @@
         }
       }
       
-      // Try nav point lookup
       const lookup = navPointMap[trimmed.toUpperCase()];
       return lookup ? { coord: lookup, name: trimmed.toUpperCase() } : null;
     }
@@ -795,12 +822,9 @@
     }
 
     // ============================================================
-    // CORE GEOMETRY FUNCTIONS - FIXED
+    // CORE GEOMETRY FUNCTIONS
     // ============================================================
 
-    /**
-     * Check if a point is inside a polygon using ray casting algorithm
-     */
     function pointInPolygon(point, ring) {
       const [x, y] = point;
       let inside = false;
@@ -814,9 +838,6 @@
       return inside;
     }
 
-    /**
-     * Calculate distance from a point to a line segment
-     */
     function distanceToSegment(point, segStart, segEnd) {
       const [px, py] = point;
       const [x1, y1] = segStart;
@@ -839,35 +860,13 @@
       return Math.hypot(px - closestX, py - closestY);
     }
 
-    /**
-     * FIXED: Calculate signed distance from point to line (cross product)
-     * 
-     * Returns POSITIVE if point is to the LEFT of the line (when looking from start to end)
-     * Returns NEGATIVE if point is to the RIGHT of the line
-     * 
-     * In geographic coordinates (lon increases east, lat increases north):
-     * - For an eastward line: LEFT = NORTH
-     * - For a northward line: LEFT = WEST
-     */
     function signedDistanceToLine(point, lineStart, lineEnd) {
       const dx = lineEnd[0] - lineStart[0];
       const dy = lineEnd[1] - lineStart[1];
-      
-      // Standard 2D cross product: (line direction) × (point - line start)
-      // cross = dx * (py - ly) - dy * (px - lx)
       const cross = dx * (point[1] - lineStart[1]) - dy * (point[0] - lineStart[0]);
-      
       return cross;
     }
 
-    /**
-     * FIXED: Determine if a point is on the specified compass side of a line
-     * 
-     * @param {Array} point - [lon, lat] coordinate
-     * @param {Array} lineCoords - Array of [lon, lat] coordinates defining the line
-     * @param {string} direction - Compass direction: N, S, E, W, NE, NW, SE, SW
-     * @returns {boolean} true if point is on the specified side
-     */
     function isPointOnCompassSideOfLine(point, lineCoords, direction) {
       if (!lineCoords || lineCoords.length < 2) return false;
 
@@ -875,29 +874,20 @@
       const lineStart = lineCoords[0];
       const lineEnd = lineCoords[lineCoords.length - 1];
       
-      // Calculate signed distance (positive = left of line)
       const signedDist = signedDistanceToLine(point, lineStart, lineEnd);
       
-      // Calculate the line's direction vector (normalized)
       const dx = lineEnd[0] - lineStart[0];
       const dy = lineEnd[1] - lineStart[1];
       const len = Math.hypot(dx, dy);
       
       if (len === 0) return false;
       
-      const ndx = dx / len; // Normalized direction x (east component)
-      const ndy = dy / len; // Normalized direction y (north component)
+      const ndx = dx / len;
+      const ndy = dy / len;
       
-      // The LEFT perpendicular of the line points in direction (-ndy, ndx)
-      // This is the direction you'd face if standing on the line facing from start to end
-      // and looking to your left
-      const leftPerpX = -ndy; // East component of left perpendicular
-      const leftPerpY = ndx;  // North component of left perpendicular
+      const leftPerpX = -ndy;
+      const leftPerpY = ndx;
       
-      // Determine which compass direction the LEFT side of the line faces
-      // and whether our target direction matches that side
-      
-      // Calculate dot products with compass directions
       const compassVectors = {
         'N': [0, 1],
         'S': [0, -1],
@@ -912,25 +902,13 @@
       const compassVec = compassVectors[dir];
       if (!compassVec) return false;
       
-      // Dot product of left perpendicular with target compass direction
-      // Positive = left side faces that direction
-      // Negative = right side faces that direction
       const dotWithLeft = leftPerpX * compassVec[0] + leftPerpY * compassVec[1];
       
-      // If dot product is positive, the left side faces our target direction
-      // So points on the left side (signedDist > 0) are on the target compass side
-      // If dot product is negative, the right side faces our target direction
-      // So points on the right side (signedDist < 0) are on the target compass side
-      
       if (dotWithLeft > 0.1) {
-        // Left side faces target direction
         return signedDist > 0;
       } else if (dotWithLeft < -0.1) {
-        // Right side faces target direction
         return signedDist < 0;
       } else {
-        // Line is roughly parallel to target direction - use fallback
-        // Check actual compass position of point relative to line center
         const lineCenterLon = (lineStart[0] + lineEnd[0]) / 2;
         const lineCenterLat = (lineStart[1] + lineEnd[1]) / 2;
         
@@ -951,10 +929,6 @@
       }
     }
 
-    /**
-     * FIXED: Check if point is between two lines
-     * Point must be on opposite sides of the two lines
-     */
     function isPointBetweenLines(point, line1Coords, line2Coords) {
       if (!line1Coords || line1Coords.length < 2) return false;
       if (!line2Coords || line2Coords.length < 2) return false;
@@ -962,21 +936,15 @@
       const dist1 = signedDistanceToLine(point, line1Coords[0], line1Coords[line1Coords.length - 1]);
       const dist2 = signedDistanceToLine(point, line2Coords[0], line2Coords[line2Coords.length - 1]);
       
-      // Point is between lines if it's on opposite sides of each line
-      // OR if one distance is very small (point is ON a line)
       const threshold = 0.01;
       
       if (Math.abs(dist1) < threshold || Math.abs(dist2) < threshold) {
-        return true; // Point is on or very close to one of the lines
+        return true;
       }
       
-      // Check if point is on opposite sides (different signs)
       return (dist1 > 0 && dist2 < 0) || (dist1 < 0 && dist2 > 0);
     }
 
-    /**
-     * Generate sample points within a polygon
-     */
     function generateSamplePoints(ring, gridSize = 100) {
       if (!ring || ring.length < 3) return [];
 
@@ -1009,9 +977,6 @@
       return points;
     }
 
-    /**
-     * Calculate centroid of a set of points
-     */
     function calculateCentroidOfPoints(points) {
       if (!points || points.length === 0) return [0, 0];
       let sumX = 0, sumY = 0;
@@ -1021,10 +986,6 @@
       });
       return [sumX / points.length, sumY / points.length];
     }
-
-    // ============================================================
-    // LINE DRAWING AND CLIPPING
-    // ============================================================
 
     function lineIntersection(p1, p2, p3, p4) {
       const x1 = p1[0], y1 = p1[1];
@@ -1134,10 +1095,6 @@
       return { solid, dashed };
     }
 
-    // ============================================================
-    // MAIN SPLIT LINE DRAWING FUNCTION - FIXED
-    // ============================================================
-
     function drawSplitLines() {
       const solidLineFeatures = [];
       const dashedLineFeatures = [];
@@ -1177,11 +1134,37 @@
         return feature?.geometry?.coordinates?.[0] || null;
       };
 
+      const extendLineToRing = (coords, ring) => {
+        if (!coords || coords.length < 2) return coords;
+        
+        const firstDir = [
+          coords[0][0] - coords[1][0],
+          coords[0][1] - coords[1][1]
+        ];
+        const firstLen = Math.hypot(firstDir[0], firstDir[1]);
+        const firstNorm = firstLen > 0 ? [firstDir[0] / firstLen, firstDir[1] / firstLen] : [0, 0];
+        const startBoundary = extendToBoundary(coords[0], firstNorm, ring);
+
+        const lastIdx = coords.length - 1;
+        const lastDir = [
+          coords[lastIdx][0] - coords[lastIdx - 1][0],
+          coords[lastIdx][1] - coords[lastIdx - 1][1]
+        ];
+        const lastLen = Math.hypot(lastDir[0], lastDir[1]);
+        const lastNorm = lastLen > 0 ? [lastDir[0] / lastLen, lastDir[1] / lastLen] : [0, 0];
+        const endBoundary = extendToBoundary(coords[lastIdx], lastNorm, ring);
+
+        return [
+          ...(startBoundary ? [startBoundary] : []),
+          ...coords,
+          ...(endBoundary ? [endBoundary] : [])
+        ];
+      };
+
       Object.entries(areaSplits || {}).forEach(([areaCode, rules]) => {
         const ring = getAreaRing(areaCode);
         if (!ring) return;
 
-        // Build extended line coordinates for each rule
         const ruleLineData = [];
 
         rules.forEach((rule, idx) => {
@@ -1266,11 +1249,8 @@
           ruleLineData.push(lineData);
         });
 
-        // Generate sample points for this area
         const samplePoints = generateSamplePoints(ring, 150);
-        console.log(`${areaCode}: ${samplePoints.length} sample points generated`);
 
-        // FIXED: Create labels for split zones using proper geometry
         rules.forEach((rule, ruleIdx) => {
           if (!rule.qnh) return;
 
@@ -1278,23 +1258,18 @@
           let zonePoints = [];
 
           if (rule.type === 'of' && rule.dir) {
-            // FIXED: Use proper compass direction check
             if (lineData?.lhsExtended && lineData.lhsExtended.length >= 2) {
               zonePoints = samplePoints.filter(pt =>
                 isPointOnCompassSideOfLine(pt, lineData.lhsExtended, rule.dir)
               );
-              console.log(`${areaCode} rule ${ruleIdx} (${rule.dir} OF): Found ${zonePoints.length} points`);
             }
           } else if (rule.type === 'between') {
-            // FIXED: Use proper between-lines check
             if (lineData?.lhsExtended && lineData?.rhsExtended) {
               zonePoints = samplePoints.filter(pt =>
                 isPointBetweenLines(pt, lineData.lhsExtended, lineData.rhsExtended)
               );
-              console.log(`${areaCode} rule ${ruleIdx} (BETWEEN): Found ${zonePoints.length} points`);
             }
           } else if (rule.type === 'rest') {
-            // Find points NOT in other zones
             zonePoints = samplePoints.filter(pt => {
               for (let i = 0; i < rules.length; i++) {
                 if (i === ruleIdx || !rules[i].qnh) continue;
@@ -1314,17 +1289,12 @@
               }
               return true;
             });
-            console.log(`${areaCode} rule ${ruleIdx} (REST): Found ${zonePoints.length} points`);
           }
 
-          // Place label at centroid of zone points
           if (zonePoints.length > 0) {
             const centroid = calculateCentroidOfPoints(zonePoints);
             
-            // Verify centroid is inside the area polygon
             if (pointInPolygon(centroid, ring)) {
-              console.log(`${areaCode} rule ${ruleIdx}: Label at [${centroid[0].toFixed(2)}, ${centroid[1].toFixed(2)}]`);
-
               splitLabelFeatures.push({
                 type: 'Feature',
                 properties: {
@@ -1337,7 +1307,6 @@
                 geometry: { type: 'Point', coordinates: centroid }
               });
             } else {
-              // If centroid is outside, find the closest zone point to the centroid that IS inside
               let closestInside = null;
               let minDist = Infinity;
               for (const pt of zonePoints) {
@@ -1349,7 +1318,6 @@
               }
               
               if (closestInside) {
-                console.log(`${areaCode} rule ${ruleIdx}: Using zone point instead of centroid`);
                 splitLabelFeatures.push({
                   type: 'Feature',
                   properties: {
@@ -1363,41 +1331,10 @@
                 });
               }
             }
-          } else {
-            console.warn(`${areaCode} rule ${ruleIdx}: No points found for zone`);
           }
         });
       });
 
-      // Helper function to extend a line to the ring boundary in both directions
-      function extendLineToRing(coords, ring) {
-        if (!coords || coords.length < 2) return coords;
-        
-        const firstDir = [
-          coords[0][0] - coords[1][0],
-          coords[0][1] - coords[1][1]
-        ];
-        const firstLen = Math.hypot(firstDir[0], firstDir[1]);
-        const firstNorm = firstLen > 0 ? [firstDir[0] / firstLen, firstDir[1] / firstLen] : [0, 0];
-        const startBoundary = extendToBoundary(coords[0], firstNorm, ring);
-
-        const lastIdx = coords.length - 1;
-        const lastDir = [
-          coords[lastIdx][0] - coords[lastIdx - 1][0],
-          coords[lastIdx][1] - coords[lastIdx - 1][1]
-        ];
-        const lastLen = Math.hypot(lastDir[0], lastDir[1]);
-        const lastNorm = lastLen > 0 ? [lastDir[0] / lastLen, lastDir[1] / lastLen] : [0, 0];
-        const endBoundary = extendToBoundary(coords[lastIdx], lastNorm, ring);
-
-        return [
-          ...(startBoundary ? [startBoundary] : []),
-          ...coords,
-          ...(endBoundary ? [endBoundary] : [])
-        ];
-      }
-
-      // Update map sources
       const solidLineFC = { type: 'FeatureCollection', features: solidLineFeatures };
       const dashedLineFC = { type: 'FeatureCollection', features: dashedLineFeatures };
       const pointFC = { type: 'FeatureCollection', features: pointFeatures };
@@ -1497,124 +1434,171 @@
     }
 
     // ============================================================
-    // EXPORT FUNCTIONS
+    // EXPORT FUNCTIONS - IMPROVED
     // ============================================================
 
-    async function autoExportToR2() {
-      console.log('Starting auto-export to R2...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
-
-      const regions = ['AU', 'NE', 'SE', 'NW', 'SW'];
-      let successCount = 0;
-
-      for (const regionCode of regions) {
-        try {
-          await exportRegionToR2(regionCode);
-          successCount++;
-          if (successCount < regions.length) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        } catch (error) {
-          console.error(`Failed to export ${regionCode} to R2:`, error);
+    function waitForMapReady() {
+      return new Promise((resolve) => {
+        if (mapFullyReady && map && map.loaded()) {
+          resolve();
+        } else {
+          const checkInterval = setInterval(() => {
+            if (mapFullyReady && map && map.loaded()) {
+              clearInterval(checkInterval);
+              resolve();
+            }
+          }, 100);
+          
+          // Timeout after 30 seconds
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            resolve();
+          }, 30000);
         }
-      }
-
-      console.log(`Auto-export complete: ${successCount}/${regions.length} regions uploaded to R2`);
-    }
-
-    async function uploadImageToR2(blob, filename) {
-      try {
-        const formData = new FormData();
-        formData.append('file', blob, filename);
-
-        const response = await fetchWithTimeout(UPLOAD_WORKER_URL, {
-          method: 'POST',
-          body: formData
-        }, 60000);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(`Upload failed: ${response.status} - ${errorText}`);
-        }
-
-        const result = await response.json();
-        return result;
-      } catch (error) {
-        console.error('Upload to R2 failed:', error);
-        throw error;
-      }
+      });
     }
 
     function waitForMapIdle() {
       return new Promise(resolve => {
+        if (!map) {
+          resolve();
+          return;
+        }
+
         const onIdle = () => {
           map.off('idle', onIdle);
           resolve();
         };
 
-        if (!map.isMoving() && map.loaded() && (!map.areTilesLoaded || map.areTilesLoaded())) {
-          resolve();
+        if (!map.isMoving() && map.loaded()) {
+          // Give extra time for tiles to load
+          setTimeout(resolve, 500);
         } else {
           map.once('idle', onIdle);
+          setTimeout(() => {
+            map.off('idle', onIdle);
+            resolve();
+          }, 5000);
         }
-
-        setTimeout(() => {
-          map.off('idle', onIdle);
-          resolve();
-        }, 5000);
       });
     }
 
-    async function exportRegionToR2(regionCode) {
-      if (!map || !map.loaded()) {
-        throw new Error('Map is not ready');
-      }
-
+    async function captureMapAsBlob(regionCode) {
       const region = EXPORT_REGIONS[regionCode];
       if (!region) {
         throw new Error(`Unknown region: ${regionCode}`);
       }
 
+      // Store current view
       const currentCenter = map.getCenter();
       const currentZoom = map.getZoom();
 
       try {
+        // Fit to region
         const mapBounds = new maplibregl.LngLatBounds(region.bounds[0], region.bounds[1]);
         map.fitBounds(mapBounds, { padding: 10, duration: 0, maxZoom: 6 });
 
+        // Wait for rendering
         await waitForMapIdle();
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1000));
 
+        // Get canvas
         const canvas = map.getCanvas();
-        const ctx = canvas.getContext('2d');
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const hasContent = imageData.data.some(channel => channel !== 0);
-
-        if (!hasContent) {
-          console.warn(`Canvas appears blank for ${regionCode}, waiting longer...`);
-          await new Promise(resolve => setTimeout(resolve, 2000));
+        if (!canvas) {
+          throw new Error('Canvas not available');
         }
 
-        const blob = await new Promise(resolve => {
-          canvas.toBlob(resolve, 'image/png', 1.0);
+        // Create blob
+        const blob = await new Promise((resolve, reject) => {
+          try {
+            canvas.toBlob((b) => {
+              if (b) {
+                resolve(b);
+              } else {
+                reject(new Error('Failed to create blob from canvas'));
+              }
+            }, 'image/png', 1.0);
+          } catch (e) {
+            reject(e);
+          }
         });
 
-        if (!blob || blob.size < 1000) {
-          throw new Error(`Generated image is too small (${blob?.size || 0} bytes)`);
-        }
-
-        const filename = `IDYA0002.QNH.${regionCode}.png`;
-        await uploadImageToR2(blob, filename);
-
-        console.log(`Uploaded ${filename} to R2 (${blob.size} bytes)`);
-
+        // Restore view
         map.jumpTo({ center: currentCenter, zoom: currentZoom });
 
-        return filename;
+        return blob;
       } catch (error) {
+        // Restore view on error
         map.jumpTo({ center: currentCenter, zoom: currentZoom });
         throw error;
       }
+    }
+
+    async function uploadToR2(blob, filename) {
+      const formData = new FormData();
+      formData.append('file', blob, filename);
+
+      const response = await fetchWithTimeout(UPLOAD_WORKER_URL, {
+        method: 'POST',
+        body: formData
+      }, 60000);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Upload failed: ${response.status} - ${errorText}`);
+      }
+
+      return await response.json();
+    }
+
+    async function autoExportAllToR2() {
+      console.log('Starting auto-export to R2...');
+      
+      await waitForMapReady();
+      
+      const regions = ['AU', 'NE', 'SE', 'NW', 'SW'];
+      let successCount = 0;
+      const errors = [];
+
+      for (const regionCode of regions) {
+        try {
+          const blob = await captureMapAsBlob(regionCode);
+          
+          if (!blob || blob.size < 1000) {
+            throw new Error(`Image too small: ${blob?.size || 0} bytes`);
+          }
+
+          const filename = `qnh-${regionCode.toLowerCase()}.png`;
+          await uploadToR2(blob, filename);
+          
+          console.log(`✓ Uploaded ${filename} (${blob.size} bytes)`);
+          successCount++;
+
+          // Small delay between exports
+          await new Promise(resolve => setTimeout(resolve, 500));
+        } catch (error) {
+          console.error(`✗ Failed to export ${regionCode}:`, error);
+          errors.push({ region: regionCode, error: error.message });
+        }
+      }
+
+      console.log(`Auto-export complete: ${successCount}/${regions.length} regions uploaded`);
+      
+      if (successCount === regions.length) {
+        showSuccess(`All ${successCount} regional maps uploaded to R2`);
+      } else if (successCount > 0) {
+        showWarning(`Uploaded ${successCount}/${regions.length} maps. Failed: ${errors.map(e => e.region).join(', ')}`);
+      } else {
+        showWarning('Failed to upload any maps to R2');
+      }
+
+      return { successCount, total: regions.length, errors };
+    }
+
+    // Manual export button handler
+    async function manualExportAllToR2() {
+      showSuccess('Starting upload to R2...');
+      await autoExportAllToR2();
     }
 
     function toggleExportPanel() {
@@ -1624,15 +1608,18 @@
 
     async function exportRegion(regionCode) {
       if (!map || !map.loaded()) {
-        showWarning('Map is not ready yet. Please wait for the map to finish loading.');
+        showWarning('Map is not ready yet.');
         return;
       }
 
       try {
-        let bounds, regionName;
+        let regionName;
 
         if (regionCode === 'CURRENT') {
           regionName = 'Current View';
+          const canvas = map.getCanvas();
+          const dataURL = canvas.toDataURL('image/png');
+          downloadDataURL(dataURL, `qnh-current-${Date.now()}.png`);
         } else {
           const region = EXPORT_REGIONS[regionCode];
           if (!region) {
@@ -1640,40 +1627,38 @@
             return;
           }
 
-          bounds = region.bounds;
           regionName = region.name;
-
-          const mapBounds = new maplibregl.LngLatBounds(bounds[0], bounds[1]);
-          map.fitBounds(mapBounds, { padding: 10, duration: 0, maxZoom: 6 });
-
-          await new Promise(resolve => setTimeout(resolve, 1000));
+          const blob = await captureMapAsBlob(regionCode);
+          
+          const dataURL = await new Promise(resolve => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result);
+            reader.readAsDataURL(blob);
+          });
+          
+          downloadDataURL(dataURL, `qnh-${regionCode.toLowerCase()}-${Date.now()}.png`);
         }
 
-        const canvas = map.getCanvas();
-        const dataURL = canvas.toDataURL('image/png');
-
-        const now = new Date();
-        const timestamp = now.toISOString().replace(/[:.]/g, '-').split('T')[0];
-        const filename = `IDYA0002.QNH.${regionCode}.${timestamp}.png`;
-
-        const link = document.createElement('a');
-        link.download = filename;
-        link.href = dataURL;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-
-        showSuccess(`Exported ${regionName} map as ${filename}`);
-        console.log(`Exported map region: ${regionCode} as ${filename}`);
-
+        showSuccess(`Exported ${regionName} map`);
       } catch (error) {
         console.error('Export failed:', error);
         showWarning(`Failed to export map: ${error.message}`);
       }
     }
 
+    function downloadDataURL(dataURL, filename) {
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = dataURL;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    // Global exports
     window.toggleExportPanel = toggleExportPanel;
     window.exportRegion = exportRegion;
+    window.manualExportAllToR2 = manualExportAllToR2;
 
   </script>
 </body>
