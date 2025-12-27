@@ -2,7 +2,6 @@ name: Generate QNH Screenshots
 
 on:
   schedule:
-    # Every 15 minutes to avoid overlapping runs
     - cron: "*/15 * * * *"
 
   workflow_dispatch:
@@ -17,7 +16,6 @@ permissions:
 
 concurrency:
   group: qnh-screenshots
-  # Do not cancel a run mid apt/puppeteer, queue instead
   cancel-in-progress: false
 
 jobs:
@@ -56,7 +54,6 @@ jobs:
             libgl1-mesa-dri \
             mesa-utils
 
-          # Ubuntu 24.04 uses libasound2t64, older runners use libasound2
           sudo apt-get install -y libasound2t64 || sudo apt-get install -y libasound2
 
       - name: Check for QNH data changes
@@ -121,28 +118,25 @@ jobs:
             sw: { bounds: [[110, -45], [138, -30]], name: 'Southwest' },
           };
 
+          const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
           async function main() {
             if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR, { recursive: true });
 
             const browser = await puppeteer.launch({
-              // Headful + Xvfb is most reliable for WebGL on CI
               headless: false,
               args: [
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
 
-                // WebGL / renderer settings
                 '--enable-webgl',
                 '--ignore-gpu-blocklist',
                 '--use-gl=angle',
                 '--use-angle=swiftshader',
-
-                // Opt in to software WebGL explicitly (Chrome is deprecating automatic fallback)
                 '--enable-unsafe-swiftshader',
                 '--disable-gpu-sandbox',
 
-                // Reduce odd renderer paths on runners
                 '--disable-features=Vulkan',
                 '--disable-features=UseSkiaRenderer',
               ]
@@ -160,7 +154,6 @@ jobs:
                 if (res.status() >= 400) console.log(`[HTTP ${res.status()}] ${res.url()}`);
               });
 
-              // Capture the map instance even if your site does not attach it to window.map
               await page.evaluateOnNewDocument(() => {
                 let internal;
                 Object.defineProperty(window, 'maplibregl', {
@@ -188,14 +181,11 @@ jobs:
 
               await page.waitForSelector('#map', { timeout: 120000 });
 
-              // Wait for map instance to exist and load
               await page.waitForFunction(() => window.__map && typeof window.__map.loaded === 'function', { timeout: 120000 });
               await page.waitForFunction(() => window.__map.loaded(), { timeout: 120000 });
 
-              // Ensure the canvas exists
               await page.waitForSelector('#map canvas', { timeout: 120000 });
 
-              // Force labels to render even if they would normally collide and hide
               await page.evaluate(() => {
                 const m = window.__map;
                 if (!m) return;
@@ -234,7 +224,7 @@ jobs:
                 }, cfg.bounds);
 
                 await waitForIdle();
-                await page.waitForTimeout(1200);
+                await sleep(1200);
 
                 const mapEl = await page.$('#map');
                 const filename = `qnh-${code}.png`;
@@ -293,16 +283,3 @@ jobs:
           git add .qnh-cache/last_issued.txt
           git commit -m "Update QNH issued cache" || echo "No cache changes to commit"
           git push
-
-      # Optional, if you want screenshots committed into the repo as well
-      # - name: Commit screenshots to repo
-      #   if: steps.check-changes.outputs.changed == 'true'
-      #   shell: bash
-      #   run: |
-      #     set -e
-      #     git config user.name "github-actions[bot]"
-      #     git config user.email "github-actions[bot]@users.noreply.github.com"
-      #
-      #     git add screenshots/*.png
-      #     git commit -m "Update QNH screenshots" || echo "No screenshot changes to commit"
-      #     git push
