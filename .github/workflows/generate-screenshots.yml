@@ -107,7 +107,7 @@ jobs:
           const fs = require('fs');
           const path = require('path');
 
-          const MAP_URL = 'https://areaqnh.actuallyleviticus.xyz/index.html';
+          const MAP_URL = 'https://areaqnh.actuallyleviticus.xyz/index.html?capture=1';
           const OUTPUT_DIR = './screenshots';
 
           const REGIONS = {
