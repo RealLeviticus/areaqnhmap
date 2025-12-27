@@ -2,7 +2,7 @@ name: Generate QNH Screenshots
 
 on:
   schedule:
-    # Every 15 minutes (avoid overlapping runs and cancels)
+    # Every 15 minutes to avoid overlapping runs
     - cron: "*/15 * * * *"
 
   workflow_dispatch:
@@ -17,7 +17,7 @@ permissions:
 
 concurrency:
   group: qnh-screenshots
-  # Do NOT cancel, let later runs wait instead of killing apt/puppeteer mid run
+  # Do not cancel a run mid apt/puppeteer, queue instead
   cancel-in-progress: false
 
 jobs:
@@ -64,6 +64,7 @@ jobs:
         shell: bash
         run: |
           set -e
+
           mkdir -p .qnh-cache
 
           CURRENT_ISSUED=$(curl -s 'https://areaqnh.therealleviticus.workers.dev/' | grep -oP 'Issued:\s*\K[^<\n]+' | head -1 || true)
@@ -136,6 +137,10 @@ jobs:
                 '--ignore-gpu-blocklist',
                 '--use-gl=angle',
                 '--use-angle=swiftshader',
+
+                // Opt in to software WebGL explicitly (Chrome is deprecating automatic fallback)
+                '--enable-unsafe-swiftshader',
+                '--disable-gpu-sandbox',
 
                 // Reduce odd renderer paths on runners
                 '--disable-features=Vulkan',
@@ -288,3 +293,16 @@ jobs:
           git add .qnh-cache/last_issued.txt
           git commit -m "Update QNH issued cache" || echo "No cache changes to commit"
           git push
+
+      # Optional, if you want screenshots committed into the repo as well
+      # - name: Commit screenshots to repo
+      #   if: steps.check-changes.outputs.changed == 'true'
+      #   shell: bash
+      #   run: |
+      #     set -e
+      #     git config user.name "github-actions[bot]"
+      #     git config user.email "github-actions[bot]@users.noreply.github.com"
+      #
+      #     git add screenshots/*.png
+      #     git commit -m "Update QNH screenshots" || echo "No screenshot changes to commit"
+      #     git push
