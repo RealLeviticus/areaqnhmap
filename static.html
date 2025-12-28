@@ -10,7 +10,6 @@
 
   <style>
     :root {
-      /* Match the light interactive map */
       --bg: #ffffff;
       --card-bg: #ffffff;
       --border: #d0d0d0;
@@ -146,11 +145,6 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
     }
 
-    /* We no longer need featured sizing differences – make them all equal */
-    .region-card.featured {
-      grid-column: auto;
-    }
-
     .region-header {
       padding: 12px 16px;
       background: #f7f7f7;
@@ -187,16 +181,13 @@
       flex-shrink: 0;
     }
 
-    /* ✅ Force every image container to same height as AU used to be */
     .region-image-container {
       position: relative;
       background: #ffffff;
       min-height: 300px;
-      /* placeholder height before load */
       overflow: hidden;
     }
 
-    /* ✅ Make image fit inside container without stretching */
     .region-image {
       width: 100%;
       height: auto;
@@ -213,6 +204,9 @@
 
     .loading-spinner {
       position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       width: 40px;
       height: 40px;
       border: 3px solid var(--border);
@@ -227,12 +221,15 @@
 
     @keyframes spin {
       to {
-        transform: rotate(360deg);
+        transform: translate(-50%, -50%) rotate(360deg);
       }
     }
 
     .error-message {
       position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       text-align: center;
       color: var(--text-muted);
       padding: 20px;
@@ -339,7 +336,7 @@
       <div class="region-card" data-region="AU">
         <div class="region-header">
           <div class="region-header-main">
-            <span class="region-title">Australia (Full)</span>
+            <span class="region-title">Australia</span>
             <span class="region-validity"></span>
           </div>
           <span class="region-code">AU</span>
@@ -355,21 +352,21 @@
         </div>
       </div>
 
-      <div class="region-card" data-region="NE">
+      <div class="region-card" data-region="WA">
         <div class="region-header">
           <div class="region-header-main">
-            <span class="region-title">Northeast (QLD / North NSW)</span>
+            <span class="region-title">Western Australia</span>
             <span class="region-validity"></span>
           </div>
-          <span class="region-code">NE</span>
+          <span class="region-code">WA</span>
         </div>
         <div class="region-image-container">
-          <div class="loading-spinner" id="spinner-NE"></div>
-          <div class="error-message" id="error-NE" style="display:none;"></div>
-          <img class="region-image" id="img-NE" alt="Northeast QNH Map" />
+          <div class="loading-spinner" id="spinner-WA"></div>
+          <div class="error-message" id="error-WA" style="display:none;"></div>
+          <img class="region-image" id="img-WA" alt="Western Australia QNH Map" />
         </div>
         <div class="region-footer">
-          <span class="timestamp" id="time-NE">Loading...</span>
+          <span class="timestamp" id="time-WA">Loading...</span>
           <span></span>
         </div>
       </div>
@@ -377,7 +374,7 @@
       <div class="region-card" data-region="SE">
         <div class="region-header">
           <div class="region-header-main">
-            <span class="region-title">Southeast (VIC / TAS / South NSW)</span>
+            <span class="region-title">Southeast Australia</span>
             <span class="region-validity"></span>
           </div>
           <span class="region-code">SE</span>
@@ -385,7 +382,7 @@
         <div class="region-image-container">
           <div class="loading-spinner" id="spinner-SE"></div>
           <div class="error-message" id="error-SE" style="display:none;"></div>
-          <img class="region-image" id="img-SE" alt="Southeast QNH Map" />
+          <img class="region-image" id="img-SE" alt="Southeast Australia QNH Map" />
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-SE">Loading...</span>
@@ -393,40 +390,21 @@
         </div>
       </div>
 
-      <div class="region-card" data-region="NW">
+      <div class="region-card" data-region="NE">
         <div class="region-header">
           <div class="region-header-main">
-            <span class="region-title">Northwest (NT / North WA)</span>
+            <span class="region-title">Northeast Australia</span>
             <span class="region-validity"></span>
           </div>
-          <span class="region-code">NW</span>
+          <span class="region-code">NE</span>
         </div>
         <div class="region-image-container">
-          <div class="loading-spinner" id="spinner-NW"></div>
-          <div class="error-message" id="error-NW" style="display:none;"></div>
-          <img class="region-image" id="img-NW" alt="Northwest QNH Map" />
+          <div class="loading-spinner" id="spinner-NE"></div>
+          <div class="error-message" id="error-NE" style="display:none;"></div>
+          <img class="region-image" id="img-NE" alt="Northeast Australia QNH Map" />
         </div>
         <div class="region-footer">
-          <span class="timestamp" id="time-NW">Loading...</span>
-          <span></span>
-        </div>
-      </div>
-
-      <div class="region-card" data-region="SW">
-        <div class="region-header">
-          <div class="region-header-main">
-            <span class="region-title">Southwest (SA / South WA)</span>
-            <span class="region-validity"></span>
-          </div>
-          <span class="region-code">SW</span>
-        </div>
-        <div class="region-image-container">
-          <div class="loading-spinner" id="spinner-SW"></div>
-          <div class="error-message" id="error-SW" style="display:none;"></div>
-          <img class="region-image" id="img-SW" alt="Southwest QNH Map" />
-        </div>
-        <div class="region-footer">
-          <span class="timestamp" id="time-SW">Loading...</span>
+          <span class="timestamp" id="time-NE">Loading...</span>
           <span></span>
         </div>
       </div>
@@ -447,13 +425,13 @@
   </footer>
 
   <script>
-    // Load images directly (no fetch), avoids CORS issues
     const R2_BASE_URL_RAW = 'https://qnh-images.therealleviticus.workers.dev/';
     const R2_BASE_URL = R2_BASE_URL_RAW.replace(/\/+$/, '');
 
     const QNH_URL = 'https://areaqnh.therealleviticus.workers.dev/';
 
-    const regions = ['AU', 'NE', 'SE', 'NW', 'SW'];
+    // Updated regions: AU, WA, SE, NE (removed NW and SW)
+    const regions = ['AU', 'WA', 'SE', 'NE'];
     let loadedCount = 0;
     let errorCount = 0;
 
@@ -573,7 +551,6 @@
         const rawValid = validM.at(-1)[1].replace(/\s+/g, ' ').trim();
         const rawIssued = issueM.at(-1)[1].replace(/\s+/g, ' ').trim();
 
-        // Try to normalise into "0400 UTC - 0700 UTC 27 December 2025"
         let valid = rawValid;
         let issued = rawIssued;
 

@@ -2,7 +2,7 @@ name: Generate QNH Screenshots
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "0 * * * *"  # Every hour on the hour
 
   workflow_dispatch:
     inputs:
@@ -112,10 +112,9 @@ jobs:
 
           const REGIONS = {
             au: { bounds: [[110, -45], [163, -9]], name: 'Australia' },
-            ne: { bounds: [[138, -30], [163, -9]], name: 'Northeast' },
-            se: { bounds: [[138, -45], [163, -30]], name: 'Southeast' },
-            nw: { bounds: [[110, -30], [138, -9]], name: 'Northwest' },
-            sw: { bounds: [[110, -45], [138, -30]], name: 'Southwest' },
+            wa: { bounds: [[108, -40], [152, -8]], name: 'Western Australia' },
+            se: { bounds: [[128, -46], [162, -24]], name: 'Southeast Australia' },
+            ne: { bounds: [[128, -38], [162, -8]], name: 'Northeast Australia' },
           };
 
           const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -129,14 +128,12 @@ jobs:
                 '--no-sandbox',
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
-
                 '--enable-webgl',
                 '--ignore-gpu-blocklist',
                 '--use-gl=angle',
                 '--use-angle=swiftshader',
                 '--enable-unsafe-swiftshader',
                 '--disable-gpu-sandbox',
-
                 '--disable-features=Vulkan',
                 '--disable-features=UseSkiaRenderer',
               ]
@@ -180,19 +177,15 @@ jobs:
               await page.goto(MAP_URL, { waitUntil: 'networkidle2', timeout: 120000 });
 
               await page.waitForSelector('#map', { timeout: 120000 });
-
               await page.waitForFunction(() => window.__map && typeof window.__map.loaded === 'function', { timeout: 120000 });
               await page.waitForFunction(() => window.__map.loaded(), { timeout: 120000 });
-
               await page.waitForSelector('#map canvas', { timeout: 120000 });
 
               await page.evaluate(() => {
                 const m = window.__map;
                 if (!m) return;
-
                 m.setBearing(0);
                 m.setPitch(0);
-
                 const style = m.getStyle();
                 const layers = style && style.layers ? style.layers : [];
                 for (const layer of layers) {
@@ -217,7 +210,6 @@ jobs:
                 await page.evaluate((bounds) => {
                   const m = window.__map;
                   if (!m) return;
-
                   const b = new window.maplibregl.LngLatBounds(bounds[0], bounds[1]);
                   m.fitBounds(b, { padding: 20, duration: 0 });
                   m.resize();
