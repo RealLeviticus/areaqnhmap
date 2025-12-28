@@ -112,7 +112,7 @@ jobs:
 
           const REGIONS = {
             au: { bounds: [[110, -45], [163, -9]], name: 'Australia' },
-            wa: { bounds: [[108, -40], [152, -8]], name: 'Western Australia' },
+            wa: { bounds: [[108, -38], [156, -8]], name: 'Western Australia' },
             se: { bounds: [[128, -46], [162, -24]], name: 'Southeast Australia' },
             ne: { bounds: [[128, -38], [162, -8]], name: 'Northeast Australia' },
           };
