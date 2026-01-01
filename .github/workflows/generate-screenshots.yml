@@ -110,11 +110,33 @@ jobs:
           const MAP_URL = 'https://areaqnh.actuallyleviticus.xyz/index.html?capture=1';
           const OUTPUT_DIR = './screenshots';
 
+          // Regions configured to match BOM output style
+          // Bounds: [[minLon, minLat], [maxLon, maxLat]]
           const REGIONS = {
-            au: { bounds: [[110, -45], [163, -9]], name: 'Australia' },
-            wa: { bounds: [[108, -38], [156, -8]], name: 'Western Australia' },
-            se: { bounds: [[128, -46], [162, -24]], name: 'Southeast Australia' },
-            ne: { bounds: [[128, -38], [162, -8]], name: 'Northeast Australia' },
+            au: { 
+              bounds: [[110, -45], [160, -8]], 
+              name: 'Australia',
+              width: 1000,
+              height: 1200
+            },
+            wa: { 
+              bounds: [[108, -36], [142, -12]], 
+              name: 'Western Australia',
+              width: 1000,
+              height: 1200
+            },
+            se: { 
+              bounds: [[133, -45], [156, -25]], 
+              name: 'Southeast Australia',
+              width: 1000,
+              height: 1200
+            },
+            ne: { 
+              bounds: [[138, -30], [160, -8]], 
+              name: 'Northeast Australia',
+              width: 1000,
+              height: 1200
+            },
           };
 
           const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -142,7 +164,6 @@ jobs:
             try {
               const page = await browser.newPage();
               page.setDefaultTimeout(120000);
-              await page.setViewport({ width: 1400, height: 1000, deviceScaleFactor: 2 });
 
               page.on('console', msg => console.log('[PAGE]', msg.text()));
               page.on('pageerror', err => console.log('[PAGE ERROR]', err.message));
@@ -207,16 +228,24 @@ jobs:
               for (const [code, cfg] of Object.entries(REGIONS)) {
                 console.log(`Capturing ${code} (${cfg.name})...`);
 
+                // Set viewport to match this region's dimensions
+                await page.setViewport({ 
+                  width: cfg.width, 
+                  height: cfg.height, 
+                  deviceScaleFactor: 2 
+                });
+
+                // Resize the map and fit bounds
                 await page.evaluate((bounds) => {
                   const m = window.__map;
                   if (!m) return;
-                  const b = new window.maplibregl.LngLatBounds(bounds[0], bounds[1]);
-                  m.fitBounds(b, { padding: 20, duration: 0 });
                   m.resize();
+                  const b = new window.maplibregl.LngLatBounds(bounds[0], bounds[1]);
+                  m.fitBounds(b, { padding: 40, duration: 0 });
                 }, cfg.bounds);
 
                 await waitForIdle();
-                await sleep(1200);
+                await sleep(1500);
 
                 const mapEl = await page.$('#map');
                 const filename = `qnh-${code}.png`;
