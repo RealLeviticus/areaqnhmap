@@ -10,7 +10,7 @@
 
   <style>
     :root {
-      --bg: #ffffff;
+      --bg: #f5f5f5;
       --card-bg: #ffffff;
       --border: #d0d0d0;
       --text: #111111;
@@ -45,7 +45,7 @@
     }
 
     .header-content {
-      max-width: 1400px;
+      max-width: 900px;
       margin: 0 auto;
       display: flex;
       align-items: center;
@@ -88,20 +88,13 @@
     }
 
     @keyframes pulse {
-
-      0%,
-      100% {
-        opacity: 1;
-      }
-
-      50% {
-        opacity: 0.5;
-      }
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
     }
 
     .nav-links {
       display: flex;
-      gap: 16px;
+      gap: 12px;
     }
 
     .nav-links a {
@@ -121,12 +114,12 @@
     }
 
     main {
-      max-width: 1400px;
+      max-width: 900px;
       margin: 0 auto;
       padding: 24px;
     }
 
-    .region-grid {
+    .region-list {
       display: flex;
       flex-direction: column;
       gap: 24px;
@@ -137,12 +130,6 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       overflow: hidden;
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-
-    .region-card:hover {
-      transform: translateY(-2px);
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
     }
 
     .region-header {
@@ -159,6 +146,8 @@
       display: flex;
       flex-direction: column;
       gap: 2px;
+      min-width: 0;
+      flex: 1;
     }
 
     .region-title {
@@ -167,16 +156,16 @@
     }
 
     .region-validity {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       color: var(--text-muted);
     }
 
     .region-code {
       background: var(--accent);
       color: #fff;
-      padding: 2px 8px;
+      padding: 4px 10px;
       border-radius: 6px;
-      font-size: 0.75rem;
+      font-size: 0.8rem;
       font-weight: 600;
       flex-shrink: 0;
     }
@@ -184,14 +173,15 @@
     .region-image-container {
       position: relative;
       background: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       min-height: 300px;
-      overflow: hidden;
     }
 
     .region-image {
       width: 100%;
       height: auto;
-      object-fit: contain;
       display: block;
       opacity: 0;
       transition: opacity 0.25s;
@@ -247,9 +237,6 @@
       padding: 10px 16px;
       background: #fafafa;
       border-top: 1px solid var(--border);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
       font-size: 0.8rem;
       color: var(--text-muted);
     }
@@ -261,7 +248,7 @@
       font-size: 0.85rem;
       border-top: 1px solid var(--border);
       margin-top: 24px;
-      background: #fff;
+      background: var(--card-bg);
     }
 
     footer a {
@@ -301,9 +288,7 @@
     }
 
     @media print {
-
-      header,
-      footer {
+      header, footer {
         display: none;
       }
 
@@ -319,20 +304,20 @@
     <div class="header-content">
       <div>
         <h1>Area QNH Static Maps</h1>
-        <p class="subtitle">Australian Area QNH Map</p>
+        <p class="subtitle">Australian Area QNH Forecast Maps</p>
       </div>
       <div class="status">
         <span class="status-dot" id="statusDot"></span>
         <span id="lastUpdate">Loading...</span>
       </div>
       <nav class="nav-links">
-        <a href="#" onclick="refreshImages(); return false;">↻ Refresh</a>
+        <a href="index.html">← Interactive Map</a>
       </nav>
     </div>
   </header>
 
   <main>
-    <div class="region-grid" id="regionGrid">
+    <div class="region-list" id="regionList">
       <div class="region-card" data-region="AU">
         <div class="region-header">
           <div class="region-header-main">
@@ -348,7 +333,6 @@
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-AU">Loading...</span>
-          <span></span>
         </div>
       </div>
 
@@ -367,7 +351,6 @@
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-WA">Loading...</span>
-          <span></span>
         </div>
       </div>
 
@@ -386,7 +369,6 @@
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-SE">Loading...</span>
-          <span></span>
         </div>
       </div>
 
@@ -405,7 +387,6 @@
         </div>
         <div class="region-footer">
           <span class="timestamp" id="time-NE">Loading...</span>
-          <span></span>
         </div>
       </div>
     </div>
@@ -418,7 +399,7 @@
     </div>
     <p>
       Data sourced from Australian Bureau of Meteorology.
-      Images auto-generated every 5 minutes by server.
+      Images auto-generated hourly.
       <br>
       Built for VATPAC.
     </p>
@@ -430,7 +411,6 @@
 
     const QNH_URL = 'https://areaqnh.therealleviticus.workers.dev/';
 
-    // Updated regions: AU, WA, SE, NE (removed NW and SW)
     const regions = ['AU', 'WA', 'SE', 'NE'];
     let loadedCount = 0;
     let errorCount = 0;
@@ -481,10 +461,10 @@
         lastUpdate.textContent = 'All images unavailable';
       } else if (errorCount > 0) {
         statusDot.classList.remove('error');
-        lastUpdate.textContent = `${loadedCount}/${regions.length} loaded • ${formatTimestamp(new Date())}`;
-      } else {
+        lastUpdate.textContent = `${loadedCount}/${regions.length} loaded`;
+      } else if (loadedCount === regions.length) {
         statusDot.classList.remove('error');
-        lastUpdate.textContent = `All images loaded • ${formatTimestamp(new Date())}`;
+        lastUpdate.textContent = `Updated: ${formatTimestamp(new Date())}`;
       }
     }
 
@@ -519,7 +499,7 @@
       errorCount = 0;
 
       const lastUpdate = document.getElementById('lastUpdate');
-      if (lastUpdate) lastUpdate.textContent = 'Refreshing...';
+      if (lastUpdate) lastUpdate.textContent = 'Loading...';
 
       regions.forEach(region => {
         const img = document.getElementById(`img-${region}`);
@@ -556,7 +536,7 @@
 
         const mValid = rawValid.match(/(\d{4})\s*UTC?.*?(\d{4})\s*UTC?.*?(\d{1,2}\s+\w+\s+\d{4})/i);
         if (mValid) {
-          valid = `${mValid[1]} UTC - ${mValid[2]} UTC ${mValid[3]}`;
+          valid = `${mValid[1]}-${mValid[2]} UTC ${mValid[3]}`;
         }
 
         const mIssued = rawIssued.match(/(\d{4})\s*UTC?.*?(\d{1,2}\s+\w+\s+\d{4})/i);
@@ -578,7 +558,6 @@
       refreshImages();
       fetchValidity();
     });
-    window.refreshImages = refreshImages;
   </script>
 </body>
 
