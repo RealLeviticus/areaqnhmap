@@ -114,9 +114,9 @@ jobs:
           // Bounds: [[minLon, minLat], [maxLon, maxLat]]
           const REGIONS = {
             au: { 
-              bounds: [[112, -44], [154, -10]], 
+              bounds: [[110, -44], [162, -10]], 
               name: 'Australia',
-              width: 800,
+              width: 850,
               height: 900
             },
             wa: { 
@@ -132,9 +132,9 @@ jobs:
               height: 900
             },
             ne: { 
-              bounds: [[137, -30], [156, -10]], 
+              bounds: [[135, -30], [164, -10]], 
               name: 'Northeast Australia',
-              width: 800,
+              width: 850,
               height: 900
             },
           };
