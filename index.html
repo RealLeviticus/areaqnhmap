@@ -514,105 +514,89 @@
         .filter(t => t && !skip.has(t.toUpperCase()));
     }
 
-    function signedDist(pt, a, b) { return (b[0] - a[0]) * (pt[1] - a[1]) - (b[1] - a[1]) * (pt[0] - a[0]); }
+    // Signed distance from point to line segment (positive = left side, negative = right side)
+    function signedDist(pt, a, b) { 
+      return (b[0] - a[0]) * (pt[1] - a[1]) - (b[1] - a[1]) * (pt[0] - a[0]); 
+    }
 
-    // Check if point is on a compass side of a polyline
-    function onCompassSide(pt, line, dir) {
-      if (!line || line.length < 2) return false;
+    // Determine which side of a polyline a point is on
+    // Returns positive for "left" side, negative for "right" side
+    // Uses closest segment to determine sidedness
+    function polylineSide(pt, polyline) {
+      if (!polyline || polyline.length < 2) return 0;
       
-      // Find the closest segment of the polyline to the point
       let minDist = Infinity;
       let closestSegIdx = 0;
       
-      for (let i = 0; i < line.length - 1; i++) {
-        const d = distToSeg(pt, line[i], line[i + 1]);
+      for (let i = 0; i < polyline.length - 1; i++) {
+        const d = distToSeg(pt, polyline[i], polyline[i + 1]);
         if (d < minDist) {
           minDist = d;
           closestSegIdx = i;
         }
       }
       
-      const a = line[closestSegIdx];
-      const b = line[closestSegIdx + 1];
+      return signedDist(pt, polyline[closestSegIdx], polyline[closestSegIdx + 1]);
+    }
+
+    // FIXED: Check if point is on a compass side of a polyline
+    // Uses a reference point approach - find a point definitely in the compass direction
+    // and check if the test point is on the same side of the line
+    function onCompassSide(pt, line, dir) {
+      if (!line || line.length < 2) return false;
       
-      // Calculate midpoint of the closest segment as reference
-      const midX = (a[0] + b[0]) / 2;
-      const midY = (a[1] + b[1]) / 2;
-      
-      // Calculate offset from the segment's midpoint
-      const dLon = pt[0] - midX;
-      const dLat = pt[1] - midY;
-      
-      // Use signed distance from segment for left/right determination
-      const sd = signedDist(pt, a, b);
-      
-      // Calculate segment direction vector
-      const dx = b[0] - a[0];
-      const dy = b[1] - a[1];
-      const len = Math.hypot(dx, dy);
-      if (len === 0) return false;
-      
-      // Normalized direction and perpendicular
-      const dirX = dx / len;
-      const dirY = dy / len;
-      const perpX = -dirY; // Perpendicular pointing "left" of line direction
-      const perpY = dirX;
-      
-      // Compass direction vectors (in lon/lat space: E is +lon, N is +lat)
-      const compassVectors = {
-        'N': [0, 1],
-        'S': [0, -1],
-        'E': [1, 0],
-        'W': [-1, 0],
-        'NE': [0.707, 0.707],
-        'NW': [-0.707, 0.707],
-        'SE': [0.707, -0.707],
-        'SW': [-0.707, -0.707]
-      };
-      
-      const cv = compassVectors[dir];
-      if (!cv) return false;
-      
-      // Determine which side of the line the compass direction points to
-      const dotPerp = perpX * cv[0] + perpY * cv[1];
-      
-      // If the compass direction aligns with the perpendicular, use signed distance
-      if (Math.abs(dotPerp) > 0.3) {
-        return dotPerp > 0 ? sd > 0 : sd < 0;
+      // First check: is point too close to the line? If so, exclude it (hard border)
+      let minDist = Infinity;
+      for (let i = 0; i < line.length - 1; i++) {
+        minDist = Math.min(minDist, distToSeg(pt, line[i], line[i + 1]));
       }
-      
-      // For directions more parallel to the line, use direct compass comparison
-      switch (dir) {
-        case 'N': return dLat > 0;
-        case 'S': return dLat < 0;
-        case 'E': return dLon > 0;
-        case 'W': return dLon < 0;
-        case 'NE': return dLat > 0 || dLon > 0;
-        case 'NW': return dLat > 0 || dLon < 0;
-        case 'SE': return dLat < 0 || dLon > 0;
-        case 'SW': return dLat < 0 || dLon < 0;
+      // Points within ~300m of line (0.003 degrees) are on the border - exclude
+      if (minDist < 0.003) return false;
+
+      // Map compass directions to unit vectors
+      let compassX = 0, compassY = 0;
+      switch(dir) {
+        case 'N':  compassX = 0;      compassY = 1;     break;
+        case 'S':  compassX = 0;      compassY = -1;    break;
+        case 'E':  compassX = 1;      compassY = 0;     break;
+        case 'W':  compassX = -1;     compassY = 0;     break;
+        case 'NE': compassX = 0.707;  compassY = 0.707; break;
+        case 'NW': compassX = -0.707; compassY = 0.707; break;
+        case 'SE': compassX = 0.707;  compassY = -0.707;break;
+        case 'SW': compassX = -0.707; compassY = -0.707;break;
       }
-      return false;
+
+      // Find centroid of the line
+      let cx = 0, cy = 0;
+      for (const p of line) {
+        cx += p[0];
+        cy += p[1];
+      }
+      cx /= line.length;
+      cy /= line.length;
+
+      // Create a reference point far in the compass direction from the line's centroid
+      const refPoint = [cx + compassX * 100, cy + compassY * 100];
+
+      // Determine which side of the line the reference point is on
+      const refSide = polylineSide(refPoint, line);
+      
+      // Determine which side of the line the test point is on
+      const ptSide = polylineSide(pt, line);
+
+      // Point is on the compass side if it's on the same side as the reference point
+      return (ptSide > 0) === (refSide > 0);
     }
 
     function between(pt, l1, l2) {
       if (!l1 || l1.length < 2 || !l2 || l2.length < 2) return false;
       
-      // Find which side of a polyline a point is on
-      // by finding the closest segment and checking signed distance to that segment
-      function polylineSide(pt, polyline) {
-        let minDist = Infinity;
-        let closestSegIdx = 0;
-        
-        for (let i = 0; i < polyline.length - 1; i++) {
-          const d = distToSeg(pt, polyline[i], polyline[i + 1]);
-          if (d < minDist) {
-            minDist = d;
-            closestSegIdx = i;
-          }
-        }
-        
-        return signedDist(pt, polyline[closestSegIdx], polyline[closestSegIdx + 1]);
+      // Check if point is too close to either line (hard border)
+      for (let i = 0; i < l1.length - 1; i++) {
+        if (distToSeg(pt, l1[i], l1[i + 1]) < 0.003) return false;
+      }
+      for (let i = 0; i < l2.length - 1; i++) {
+        if (distToSeg(pt, l2[i], l2[i + 1]) < 0.003) return false;
       }
       
       // Use a point from the middle of l2 as reference for "toward l2" direction
@@ -630,8 +614,8 @@
       const ptSideOfL2 = polylineSide(pt, l2);
       
       // Point is between if it's on the l2-facing side of l1 AND on the l1-facing side of l2
-      const onL2SideOfL1 = (ptSideOfL1 > 0) === (l2SideOfL1 > 0) || Math.abs(ptSideOfL1) < 0.001;
-      const onL1SideOfL2 = (ptSideOfL2 > 0) === (l1SideOfL2 > 0) || Math.abs(ptSideOfL2) < 0.001;
+      const onL2SideOfL1 = (ptSideOfL1 > 0) === (l2SideOfL1 > 0);
+      const onL1SideOfL2 = (ptSideOfL2 > 0) === (l1SideOfL2 > 0);
       
       return onL2SideOfL1 && onL1SideOfL2;
     }
@@ -657,33 +641,42 @@
     }
 
     // Find the best label position within a zone
-    // Use median coordinates for robustness with irregular/strip-shaped zones
-    function findBestZoneLabel(zone, ring) {
+    // Uses pole of inaccessibility approach - find point furthest from zone edges
+    function findBestZoneLabel(zone, ring, splitLines) {
       if (!zone || zone.length === 0) return null;
       if (zone.length === 1) return zone[0];
       
-      // Sort coordinates to find medians
-      const xs = zone.map(p => p[0]).sort((a, b) => a - b);
-      const ys = zone.map(p => p[1]).sort((a, b) => a - b);
-      
-      const midIdx = Math.floor(zone.length / 2);
-      const medianX = xs[midIdx];
-      const medianY = ys[midIdx];
-      
-      // Find the zone point closest to the median point
-      // This guarantees we return a point that's actually in the zone
-      let best = zone[0];
-      let minDist = Infinity;
+      // Find the point in the zone that is furthest from all boundaries
+      // (both the area ring and any split lines)
+      let bestPt = null;
+      let maxMinDist = -Infinity;
       
       for (const pt of zone) {
-        const d = Math.hypot(pt[0] - medianX, pt[1] - medianY);
-        if (d < minDist) {
-          minDist = d;
-          best = pt;
+        let minDist = Infinity;
+        
+        // Distance to area boundary
+        for (let i = 0; i < ring.length - 1; i++) {
+          minDist = Math.min(minDist, distToSeg(pt, ring[i], ring[i + 1]));
+        }
+        
+        // Distance to split lines if provided
+        if (splitLines) {
+          for (const line of splitLines) {
+            if (line && line.length >= 2) {
+              for (let i = 0; i < line.length - 1; i++) {
+                minDist = Math.min(minDist, distToSeg(pt, line[i], line[i + 1]));
+              }
+            }
+          }
+        }
+        
+        if (minDist > maxMinDist) {
+          maxMinDist = minDist;
+          bestPt = pt;
         }
       }
       
-      return best;
+      return bestPt || zone[0];
     }
 
     function lineInt(a, b, c, d) {
@@ -810,6 +803,7 @@
           if (r.type === 'of') {
             const pts = buildCoords(r.lhs);
             pts.forEach(p => addPt(code, p));
+
             if (pts.length >= 2) {
               d.lhs = extendLine(pts.map(p => p.coord), ring);
               const { solid, dashed } = clipLine(d.lhs, ring);
@@ -834,6 +828,23 @@
             zone = samples.filter(p => between(p, d.lhs, d.rhs));
           } else if (r.type === 'rest') {
             zone = samples.filter(p => {
+              // Check if point is on any split line (hard border)
+              for (let j = 0; j < rules.length; j++) {
+                if (!rules[j].qnh) continue;
+                const od = ruleData[j];
+                if (od.lhs) {
+                  for (let k = 0; k < od.lhs.length - 1; k++) {
+                    if (distToSeg(p, od.lhs[k], od.lhs[k + 1]) < 0.003) return false;
+                  }
+                }
+                if (od.rhs) {
+                  for (let k = 0; k < od.rhs.length - 1; k++) {
+                    if (distToSeg(p, od.rhs[k], od.rhs[k + 1]) < 0.003) return false;
+                  }
+                }
+              }
+              
+              // Check if point is in any other defined zone
               for (let j = 0; j < rules.length; j++) {
                 if (j === i || !rules[j].qnh) continue;
                 const o = rules[j], od = ruleData[j];
@@ -845,9 +856,14 @@
           }
 
           if (zone.length) {
-            // Use improved label positioning that ensures label is within the zone
-            const labelPos = findBestZoneLabel(zone, ring);
+            // Collect all split lines for this area
+            const allSplitLines = ruleData
+              .filter(rd => rd.lhs || rd.rhs)
+              .flatMap(rd => [rd.lhs, rd.rhs].filter(Boolean));
             
+            // Use improved label positioning that ensures label is within the zone
+            const labelPos = findBestZoneLabel(zone, ring, allSplitLines);
+
             lblF.push({
               type: 'Feature',
               properties: {
@@ -938,6 +954,8 @@
       } else {
         map.getSource('split-pts').setData({ type: 'FeatureCollection', features: ptF });
       }
+
+      // Debug dots for AREA-20 zones - different color per split
     }
   </script>
 </body>
