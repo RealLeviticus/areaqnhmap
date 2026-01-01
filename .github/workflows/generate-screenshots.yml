@@ -114,28 +114,28 @@ jobs:
           // Bounds: [[minLon, minLat], [maxLon, maxLat]]
           const REGIONS = {
             au: { 
-              bounds: [[110, -45], [160, -8]], 
+              bounds: [[112, -44], [154, -10]], 
               name: 'Australia',
-              width: 1000,
-              height: 1200
+              width: 800,
+              height: 900
             },
             wa: { 
-              bounds: [[108, -36], [142, -12]], 
+              bounds: [[112, -36], [138, -13]], 
               name: 'Western Australia',
-              width: 1000,
-              height: 1200
+              width: 800,
+              height: 900
             },
             se: { 
-              bounds: [[133, -45], [156, -25]], 
+              bounds: [[134, -44], [154, -28]], 
               name: 'Southeast Australia',
-              width: 1000,
-              height: 1200
+              width: 800,
+              height: 900
             },
             ne: { 
-              bounds: [[138, -30], [160, -8]], 
+              bounds: [[137, -30], [156, -10]], 
               name: 'Northeast Australia',
-              width: 1000,
-              height: 1200
+              width: 800,
+              height: 900
             },
           };
 
@@ -241,7 +241,7 @@ jobs:
                   if (!m) return;
                   m.resize();
                   const b = new window.maplibregl.LngLatBounds(bounds[0], bounds[1]);
-                  m.fitBounds(b, { padding: 40, duration: 0 });
+                  m.fitBounds(b, { padding: 60, duration: 0 });
                 }, cfg.bounds);
 
                 await waitForIdle();
