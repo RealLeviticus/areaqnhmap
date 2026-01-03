@@ -168,6 +168,131 @@
         padding: 10px 12px;
       }
     }
+
+    /* Debug panel styles */
+    #debugPanel {
+      position: fixed;
+      bottom: 60px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      max-width: 350px;
+      max-height: 70vh;
+      overflow-y: auto;
+      font-size: 0.75rem;
+      line-height: 1.4;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      z-index: 1000;
+      display: none;
+    }
+
+    #debugPanel.visible {
+      display: block;
+    }
+
+    #debugPanel h3 {
+      font-size: 0.85rem;
+      margin-bottom: 8px;
+      color: var(--text);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 4px;
+    }
+
+    #debugPanel .stat {
+      display: flex;
+      justify-content: space-between;
+      margin: 4px 0;
+      padding: 2px 0;
+    }
+
+    #debugPanel .stat-label {
+      color: var(--text-muted);
+    }
+
+    #debugPanel .stat-value {
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    #debugPanel .stat-value.good {
+      color: var(--success);
+    }
+
+    #debugPanel .stat-value.warn {
+      color: var(--warning);
+    }
+
+    #debugPanel .stat-value.bad {
+      color: var(--error);
+    }
+
+    #debugPanel .area-validation {
+      margin: 8px 0;
+      padding: 6px;
+      background: #f6f8fa;
+      border-radius: 4px;
+      font-size: 0.7rem;
+    }
+
+    #debugPanel .area-validation.has-issues {
+      background: #fff3cd;
+      border-left: 3px solid var(--warning);
+    }
+
+    #debugBtn {
+      position: fixed;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.95);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 12px;
+      cursor: pointer;
+      font-size: 1.2rem;
+      z-index: 1000;
+      transition: all 0.2s;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    #debugBtn:hover {
+      background: var(--accent);
+      color: white;
+      transform: scale(1.05);
+    }
+
+    #debugBtn.active {
+      background: var(--accent);
+      color: white;
+    }
+
+    #debugPanel .area-controls {
+      display: flex;
+      gap: 4px;
+      margin-top: 4px;
+      flex-wrap: wrap;
+    }
+
+    #debugPanel .area-controls button {
+      padding: 2px 6px;
+      font-size: 0.65rem;
+      border: 1px solid var(--border);
+      background: white;
+      border-radius: 3px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    #debugPanel .area-controls button:hover {
+      background: #f0f0f0;
+    }
+
+    #debugPanel .area-controls button.active {
+      background: var(--success);
+      color: white;
+      border-color: var(--success);
+    }
   </style>
 </head>
 
@@ -189,6 +314,13 @@
   </header>
 
   <div id="map">
+  </div>
+
+  <!-- Debug UI -->
+  <button id="debugBtn" title="Toggle Debug Panel">🐛</button>
+  <div id="debugPanel">
+    <h3>Zone Validation</h3>
+    <div id="debugContent">Click to run validation...</div>
   </div>
 
   <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
@@ -957,6 +1089,577 @@
 
       // Debug dots for AREA-20 zones - different color per split
     }
+
+    // ====== ZONE VALIDATION & DEBUG SYSTEM ======
+
+    let debugMode = false;
+    let validationResults = null;
+
+    // Validate zones for overlaps and gaps
+    function validateZones() {
+      console.log('Running zone validation...');
+      const results = { areas: [], totalOverlap: 0, totalGap: 0, splitAreas: 0 };
+
+      Object.entries(areaSplits).forEach(([code, rules]) => {
+        const ring = areaGeoJSON.features.find(f => f.properties.area_code === code)?.geometry.coordinates[0];
+        if (!ring) return;
+
+        results.splitAreas++;
+
+        // Build rule data (same as drawSplits)
+        const buildCoords = s => tokenize(s).map(resolveToken).filter(Boolean);
+        const ruleData = rules.map(r => {
+          const d = { rule: r, lhs: null, rhs: null };
+
+          if (r.type === 'between') {
+            const lp = buildCoords(r.lhs), rp = buildCoords(r.rhs);
+            if (lp.length >= 2) d.lhs = extendLine(lp.map(p => p.coord), ring);
+            if (rp.length >= 2) d.rhs = extendLine(rp.map(p => p.coord), ring);
+          }
+
+          if (r.type === 'of') {
+            const pts = buildCoords(r.lhs);
+            if (pts.length >= 2) d.lhs = extendLine(pts.map(p => p.coord), ring);
+          }
+
+          return d;
+        });
+
+        // Sample the area at lower resolution for validation (80x80 grid)
+        const samples = samplePts(ring, 80);
+
+        // Check each point to see how many zones it belongs to
+        const zoneCounts = new Array(samples.length).fill(0);
+
+        samples.forEach((p, idx) => {
+          rules.forEach((r, i) => {
+            if (!r.qnh) return;
+            const d = ruleData[i];
+            let inZone = false;
+
+            if (r.type === 'of' && r.dir && d.lhs?.length >= 2) {
+              inZone = onCompassSide(p, d.lhs, r.dir);
+            } else if (r.type === 'between' && d.lhs && d.rhs) {
+              inZone = between(p, d.lhs, d.rhs);
+            } else if (r.type === 'rest') {
+              // Check if point is on any split line (hard border)
+              let onBorder = false;
+              for (let j = 0; j < rules.length; j++) {
+                if (!rules[j].qnh) continue;
+                const od = ruleData[j];
+                if (od.lhs) {
+                  for (let k = 0; k < od.lhs.length - 1; k++) {
+                    if (distToSeg(p, od.lhs[k], od.lhs[k + 1]) < 0.003) {
+                      onBorder = true;
+                      break;
+                    }
+                  }
+                }
+                if (onBorder) break;
+                if (od.rhs) {
+                  for (let k = 0; k < od.rhs.length - 1; k++) {
+                    if (distToSeg(p, od.rhs[k], od.rhs[k + 1]) < 0.003) {
+                      onBorder = true;
+                      break;
+                    }
+                  }
+                }
+                if (onBorder) break;
+              }
+
+              if (onBorder) return;
+
+              // Check if point is in any other defined zone
+              let inOtherZone = false;
+              for (let j = 0; j < rules.length; j++) {
+                if (j === i || !rules[j].qnh) continue;
+                const o = rules[j], od = ruleData[j];
+                if (o.type === 'of' && o.dir && od.lhs && onCompassSide(p, od.lhs, o.dir)) {
+                  inOtherZone = true;
+                  break;
+                }
+                if (o.type === 'between' && od.lhs && od.rhs && between(p, od.lhs, od.rhs)) {
+                  inOtherZone = true;
+                  break;
+                }
+              }
+
+              inZone = !inOtherZone;
+            }
+
+            if (inZone) zoneCounts[idx]++;
+          });
+        });
+
+        // Calculate overlap and gap percentages
+        const overlaps = zoneCounts.filter(c => c > 1).length;
+        const gaps = zoneCounts.filter(c => c === 0).length;
+        const overlapPct = (overlaps / samples.length) * 100;
+        const gapPct = (gaps / samples.length) * 100;
+
+        results.totalOverlap += overlapPct;
+        results.totalGap += gapPct;
+
+        results.areas.push({
+          code,
+          samples: samples.length,
+          overlaps,
+          gaps,
+          overlapPct: overlapPct.toFixed(2),
+          gapPct: gapPct.toFixed(2),
+          hasIssues: overlapPct > 1 || gapPct > 1
+        });
+
+        // Log to console with color coding
+        if (overlapPct > 1 || gapPct > 1) {
+          console.warn(`⚠️ ${code}: ${overlapPct.toFixed(1)}% overlaps, ${gapPct.toFixed(1)}% gaps`);
+        } else {
+          console.log(`✓ ${code}: ${overlapPct.toFixed(1)}% overlaps, ${gapPct.toFixed(1)}% gaps`);
+        }
+      });
+
+      // Calculate averages
+      if (results.splitAreas > 0) {
+        results.avgOverlap = (results.totalOverlap / results.splitAreas).toFixed(2);
+        results.avgGap = (results.totalGap / results.splitAreas).toFixed(2);
+      }
+
+      validationResults = results;
+      return results;
+    }
+
+    // Render debug dots showing overlaps (red) and gaps (blue)
+    function renderDebugDots() {
+      if (!debugMode || !validationResults) return;
+
+      const overlapFeatures = [];
+      const gapFeatures = [];
+
+      validationResults.areas.forEach(areaResult => {
+        const ring = areaGeoJSON.features.find(f => f.properties.area_code === areaResult.code)?.geometry.coordinates[0];
+        if (!ring) return;
+
+        const rules = areaSplits[areaResult.code];
+        if (!rules) return;
+
+        // Build rule data
+        const buildCoords = s => tokenize(s).map(resolveToken).filter(Boolean);
+        const ruleData = rules.map(r => {
+          const d = { rule: r, lhs: null, rhs: null };
+
+          if (r.type === 'between') {
+            const lp = buildCoords(r.lhs), rp = buildCoords(r.rhs);
+            if (lp.length >= 2) d.lhs = extendLine(lp.map(p => p.coord), ring);
+            if (rp.length >= 2) d.rhs = extendLine(rp.map(p => p.coord), ring);
+          }
+
+          if (r.type === 'of') {
+            const pts = buildCoords(r.lhs);
+            if (pts.length >= 2) d.lhs = extendLine(pts.map(p => p.coord), ring);
+          }
+
+          return d;
+        });
+
+        const samples = samplePts(ring, 80);
+
+        samples.forEach(p => {
+          let zoneCount = 0;
+
+          rules.forEach((r, i) => {
+            if (!r.qnh) return;
+            const d = ruleData[i];
+            let inZone = false;
+
+            if (r.type === 'of' && r.dir && d.lhs?.length >= 2) {
+              inZone = onCompassSide(p, d.lhs, r.dir);
+            } else if (r.type === 'between' && d.lhs && d.rhs) {
+              inZone = between(p, d.lhs, d.rhs);
+            } else if (r.type === 'rest') {
+              // Check if on border
+              let onBorder = false;
+              for (let j = 0; j < rules.length; j++) {
+                if (!rules[j].qnh) continue;
+                const od = ruleData[j];
+                if (od.lhs) {
+                  for (let k = 0; k < od.lhs.length - 1; k++) {
+                    if (distToSeg(p, od.lhs[k], od.lhs[k + 1]) < 0.003) {
+                      onBorder = true;
+                      break;
+                    }
+                  }
+                }
+                if (onBorder) break;
+                if (od.rhs) {
+                  for (let k = 0; k < od.rhs.length - 1; k++) {
+                    if (distToSeg(p, od.rhs[k], od.rhs[k + 1]) < 0.003) {
+                      onBorder = true;
+                      break;
+                    }
+                  }
+                }
+                if (onBorder) break;
+              }
+
+              if (onBorder) return;
+
+              let inOtherZone = false;
+              for (let j = 0; j < rules.length; j++) {
+                if (j === i || !rules[j].qnh) continue;
+                const o = rules[j], od = ruleData[j];
+                if (o.type === 'of' && o.dir && od.lhs && onCompassSide(p, od.lhs, o.dir)) {
+                  inOtherZone = true;
+                  break;
+                }
+                if (o.type === 'between' && od.lhs && od.rhs && between(p, od.lhs, od.rhs)) {
+                  inOtherZone = true;
+                  break;
+                }
+              }
+
+              inZone = !inOtherZone;
+            }
+
+            if (inZone) zoneCount++;
+          });
+
+          // Add debug dot for overlaps (red) and gaps (blue)
+          if (zoneCount > 1) {
+            overlapFeatures.push({
+              type: 'Feature',
+              properties: { count: zoneCount },
+              geometry: { type: 'Point', coordinates: p }
+            });
+          } else if (zoneCount === 0) {
+            gapFeatures.push({
+              type: 'Feature',
+              properties: {},
+              geometry: { type: 'Point', coordinates: p }
+            });
+          }
+        });
+      });
+
+      // Add overlap dots (red)
+      if (map.getSource('debug-overlaps')) {
+        map.getSource('debug-overlaps').setData({ type: 'FeatureCollection', features: overlapFeatures });
+      } else {
+        map.addSource('debug-overlaps', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: overlapFeatures }
+        });
+        map.addLayer({
+          id: 'debug-overlaps',
+          type: 'circle',
+          source: 'debug-overlaps',
+          paint: {
+            'circle-radius': 3,
+            'circle-color': '#ff0000',
+            'circle-opacity': 0.6
+          }
+        });
+      }
+
+      // Add gap dots (blue)
+      if (map.getSource('debug-gaps')) {
+        map.getSource('debug-gaps').setData({ type: 'FeatureCollection', features: gapFeatures });
+      } else {
+        map.addSource('debug-gaps', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: gapFeatures }
+        });
+        map.addLayer({
+          id: 'debug-gaps',
+          type: 'circle',
+          source: 'debug-gaps',
+          paint: {
+            'circle-radius': 3,
+            'circle-color': '#0000ff',
+            'circle-opacity': 0.6
+          }
+        });
+      }
+    }
+
+    // Track which areas have polygons visible
+    const visibleAreaPolygons = new Set();
+
+    // Update debug panel content
+    function updateDebugPanel() {
+      const content = $('debugContent');
+
+      if (!validationResults) {
+        content.innerHTML = '<p style="color: var(--text-muted);">Running validation...</p>';
+        return;
+      }
+
+      const r = validationResults;
+
+      let html = `
+        <div class="stat">
+          <span class="stat-label">Split areas:</span>
+          <span class="stat-value">${r.splitAreas}</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Avg overlap:</span>
+          <span class="stat-value ${parseFloat(r.avgOverlap) > 1 ? 'warn' : 'good'}">${r.avgOverlap}%</span>
+        </div>
+        <div class="stat">
+          <span class="stat-label">Avg gap:</span>
+          <span class="stat-value ${parseFloat(r.avgGap) > 1 ? 'warn' : 'good'}">${r.avgGap}%</span>
+        </div>
+        <hr style="margin: 8px 0; border: none; border-top: 1px solid var(--border);">
+      `;
+
+      r.areas.forEach(a => {
+        const issueClass = a.hasIssues ? 'has-issues' : '';
+        const isVisible = visibleAreaPolygons.has(a.code);
+        html += `
+          <div class="area-validation ${issueClass}">
+            <strong>${a.code}</strong><br>
+            Samples: ${a.samples}<br>
+            Overlaps: ${a.overlaps} (${a.overlapPct}%)<br>
+            Gaps: ${a.gaps} (${a.gapPct}%)
+            <div class="area-controls">
+              <button onclick="toggleAreaPolygons('${a.code}')" class="${isVisible ? 'active' : ''}">
+                ${isVisible ? '✓ Hide' : 'Show'} Zones
+              </button>
+            </div>
+          </div>
+        `;
+      });
+
+      html += `
+        <p style="margin-top: 8px; font-size: 0.7rem; color: var(--text-muted);">
+          Red dots = overlaps<br>
+          Blue dots = gaps<br>
+          Colored dots = zone samples (stay inside borders)
+        </p>
+      `;
+
+      content.innerHTML = html;
+    }
+
+    // Toggle debug mode
+    function toggleDebug() {
+      debugMode = !debugMode;
+      const btn = $('debugBtn');
+      const panel = $('debugPanel');
+
+      if (debugMode) {
+        btn.classList.add('active');
+        panel.classList.add('visible');
+
+        // Run validation
+        updateDebugPanel();
+        setTimeout(() => {
+          try {
+            validateZones();
+            updateDebugPanel();
+            renderDebugDots();
+          } catch (err) {
+            console.error('Validation error:', err);
+            $('debugContent').innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
+          }
+        }, 100);
+      } else {
+        btn.classList.remove('active');
+        panel.classList.remove('visible');
+
+        // Remove debug layers
+        if (map.getLayer('debug-overlaps')) map.removeLayer('debug-overlaps');
+        if (map.getSource('debug-overlaps')) map.removeSource('debug-overlaps');
+        if (map.getLayer('debug-gaps')) map.removeLayer('debug-gaps');
+        if (map.getSource('debug-gaps')) map.removeSource('debug-gaps');
+      }
+    }
+
+    // Set up debug button
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = $('debugBtn');
+      if (btn) {
+        btn.addEventListener('click', toggleDebug);
+      }
+    });
+
+    // ====== PER-AREA COLORED DOT VISUALIZATION ======
+
+    // Toggle colored dots for a specific area
+    window.toggleAreaPolygons = function(areaCode) {
+      if (visibleAreaPolygons.has(areaCode)) {
+        visibleAreaPolygons.delete(areaCode);
+      } else {
+        visibleAreaPolygons.add(areaCode);
+      }
+
+      renderAllAreaDots();
+      updateDebugPanel();
+    };
+
+    // Render colored dots for all visible areas
+    function renderAllAreaDots() {
+      const dotFeatures = [];
+
+      visibleAreaPolygons.forEach(code => {
+        const rules = areaSplits[code];
+        if (!rules) return;
+
+        const ring = areaGeoJSON.features.find(f => f.properties.area_code === code)?.geometry.coordinates[0];
+        if (!ring) return;
+
+        // Build rule data
+        const buildCoords = s => tokenize(s).map(resolveToken).filter(Boolean);
+        const ruleData = rules.map(r => {
+          const d = { rule: r, lhs: null, rhs: null };
+
+          if (r.type === 'between') {
+            const lp = buildCoords(r.lhs), rp = buildCoords(r.rhs);
+            if (lp.length >= 2) d.lhs = extendLine(lp.map(p => p.coord), ring);
+            if (rp.length >= 2) d.rhs = extendLine(rp.map(p => p.coord), ring);
+          }
+
+          if (r.type === 'of') {
+            const pts = buildCoords(r.lhs);
+            if (pts.length >= 2) d.lhs = extendLine(pts.map(p => p.coord), ring);
+          }
+
+          return d;
+        });
+
+        // Sample at higher resolution for better dot visualization
+        const samples = samplePts(ring, 150);
+
+        rules.forEach((r, i) => {
+          if (!r.qnh) return;
+          const d = ruleData[i];
+          let zone = [];
+
+          if (r.type === 'of' && r.dir && d.lhs?.length >= 2) {
+            zone = samples.filter(p => {
+              // CRITICAL: Point MUST be inside the area polygon first
+              if (!pointInPoly(p, ring)) return false;
+
+              // HARD BORDER: Exclude points near split lines (green lines) - 5x stronger
+              for (let k = 0; k < d.lhs.length - 1; k++) {
+                if (distToSeg(p, d.lhs[k], d.lhs[k + 1]) < 0.01) return false;
+              }
+              // HARD BORDER: Exclude points near area boundary (red lines) - 5x stronger
+              for (let k = 0; k < ring.length - 1; k++) {
+                if (distToSeg(p, ring[k], ring[k + 1]) < 0.01) return false;
+              }
+              return onCompassSide(p, d.lhs, r.dir);
+            });
+          } else if (r.type === 'between' && d.lhs && d.rhs) {
+            zone = samples.filter(p => {
+              // CRITICAL: Point MUST be inside the area polygon first
+              if (!pointInPoly(p, ring)) return false;
+
+              // HARD BORDER: Exclude points near both split lines - 5x stronger
+              for (let k = 0; k < d.lhs.length - 1; k++) {
+                if (distToSeg(p, d.lhs[k], d.lhs[k + 1]) < 0.01) return false;
+              }
+              for (let k = 0; k < d.rhs.length - 1; k++) {
+                if (distToSeg(p, d.rhs[k], d.rhs[k + 1]) < 0.01) return false;
+              }
+              // HARD BORDER: Exclude points near area boundary - 5x stronger
+              for (let k = 0; k < ring.length - 1; k++) {
+                if (distToSeg(p, ring[k], ring[k + 1]) < 0.01) return false;
+              }
+              return between(p, d.lhs, d.rhs);
+            });
+          } else if (r.type === 'rest') {
+            zone = samples.filter(p => {
+              // CRITICAL: Point MUST be inside the area polygon first
+              if (!pointInPoly(p, ring)) return false;
+
+              // HARD BORDER: Exclude points near ANY split line - 5x stronger
+              for (let j = 0; j < rules.length; j++) {
+                if (!rules[j].qnh) continue;
+                const od = ruleData[j];
+                if (od.lhs) {
+                  for (let k = 0; k < od.lhs.length - 1; k++) {
+                    if (distToSeg(p, od.lhs[k], od.lhs[k + 1]) < 0.01) return false;
+                  }
+                }
+                if (od.rhs) {
+                  for (let k = 0; k < od.rhs.length - 1; k++) {
+                    if (distToSeg(p, od.rhs[k], od.rhs[k + 1]) < 0.01) return false;
+                  }
+                }
+              }
+
+              // HARD BORDER: Exclude points near area boundary - 5x stronger
+              for (let k = 0; k < ring.length - 1; k++) {
+                if (distToSeg(p, ring[k], ring[k + 1]) < 0.01) return false;
+              }
+
+              // Check if point is in any other defined zone
+              for (let j = 0; j < rules.length; j++) {
+                if (j === i || !rules[j].qnh) continue;
+                const o = rules[j], od = ruleData[j];
+                if (o.type === 'of' && o.dir && od.lhs && onCompassSide(p, od.lhs, o.dir)) return false;
+                if (o.type === 'between' && od.lhs && od.rhs && between(p, od.lhs, od.rhs)) return false;
+              }
+              return true;
+            });
+          }
+
+          // Add colored dots for this zone
+          zone.forEach(pt => {
+            dotFeatures.push({
+              type: 'Feature',
+              properties: {
+                area: code,
+                qnh: r.qnh,
+                zoneIndex: i
+              },
+              geometry: {
+                type: 'Point',
+                coordinates: pt
+              }
+            });
+          });
+        });
+      });
+
+      console.log(`Rendering ${dotFeatures.length} colored dots for ${visibleAreaPolygons.size} area(s)`);
+
+      // Update or create dot layers
+      if (map.getSource('zone-dots')) {
+        map.getSource('zone-dots').setData({ type: 'FeatureCollection', features: dotFeatures });
+      } else {
+        map.addSource('zone-dots', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: dotFeatures }
+        });
+
+        map.addLayer({
+          id: 'zone-dots',
+          type: 'circle',
+          source: 'zone-dots',
+          paint: {
+            'circle-radius': 2,
+            'circle-color': [
+              'case',
+              ['==', ['%', ['get', 'zoneIndex'], 6], 0], '#ff6464',
+              ['==', ['%', ['get', 'zoneIndex'], 6], 1], '#64ff64',
+              ['==', ['%', ['get', 'zoneIndex'], 6], 2], '#6464ff',
+              ['==', ['%', ['get', 'zoneIndex'], 6], 3], '#ffff64',
+              ['==', ['%', ['get', 'zoneIndex'], 6], 4], '#ff64ff',
+              ['==', ['%', ['get', 'zoneIndex'], 6], 5], '#64ffff',
+              '#c8c8c8'
+            ],
+            'circle-opacity': 0.7
+          }
+        });
+      }
+    }
+
+    // Toggle dots for a specific area
+    window.toggleAreaDots = function(areaCode) {
+      console.log(`Toggling dots for ${areaCode}`);
+      // TODO: Implement per-area dot visualization if needed
+    };
   </script>
 </body>
 
