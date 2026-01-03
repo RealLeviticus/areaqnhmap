@@ -551,11 +551,25 @@
         const text = (await res.text()).replace(/<[^>]+>/g, ' ').replace(/&\w+;/g, ' ').trim();
         const parsed = parseQNH(text);
 
-        areaQnhMap = parsed.qnhMap;
-        areaSplits = parsed.splits;
+        // Extract REST QNH values and use them as main QNH
+        areaQnhMap = {};
+        for (const [area, entry] of Object.entries(parsed.qnhMap)) {
+          let mainQNH = entry.qnh;
+          
+          // If this area has splits, look for the REST QNH value
+          if (parsed.splits[area]) {
+            const restRule = parsed.splits[area].find(r => r.type === 'rest');
+            if (restRule && restRule.qnh) {
+              mainQNH = restRule.qnh;
+            }
+          }
+          
+          areaQnhMap[area] = { qnh: mainQNH };
+        }
+        
+        areaSplits = {}; // Disable splits
 
         updateLabels();
-        drawSplits();
 
         const v = parsed.validity;
         $('statusDot').className = 'status-dot';
