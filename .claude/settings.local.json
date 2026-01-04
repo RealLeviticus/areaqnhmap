@@ -3,7 +3,8 @@
     "allow": [
       "Bash(cd:*)",
       "Bash(cat:*)",
-      "Bash(node --check:*)"
+      "Bash(node --check:*)",
+      "Bash(curl:*)"
     ]
   }
 }
