@@ -381,6 +381,7 @@
       map.on('load', async () => {
         await loadAreas();
         await fetchNav();
+        await loadVfrFallback();
         await fetchQNH();
         setInterval(fetchQNH, 300000);
       });
@@ -522,6 +523,20 @@
       }
     }
 
+    async function loadVfrFallback() {
+      try {
+        const res = await fetch('data/vfr_fallback.json?t=' + Date.now());
+        if (!res.ok) return;
+        const data = await res.json();
+        Object.entries(data).forEach(([code, coord]) => {
+          const key = code.toUpperCase();
+          if (!navPointMap[key]) navPointMap[key] = coord;
+        });
+      } catch (e) {
+        // console.error(e);
+      }
+    }
+
     function parseCoord(raw) {
       if (!raw) return null;
       const p = raw.split(/(?=[+-]\d)/).filter(Boolean);
@@ -553,6 +568,11 @@
 
         areaQnhMap = parsed.qnhMap;
         areaSplits = parsed.splits;
+
+        // Debug: log Area 63 splits
+        if (areaSplits['AREA-63']) {
+          console.log('Area 63 splits:', areaSplits['AREA-63']);
+        }
 
         updateLabels();
         drawSplits();
@@ -831,7 +851,14 @@
         }
       }
       
-      return bestPt || zone[0];
+      // If we found a point, validate it has reasonable distance from boundaries
+      // If not, return centroid as fallback
+      if (bestPt && maxMinDist > 0.01) {
+        return bestPt;
+      }
+      
+      // Fallback: centroid of the zone
+      return centroid(zone);
     }
 
     function lineInt(a, b, c, d) {
@@ -976,6 +1003,11 @@
           if (r.type === 'of') {
             const pts = buildCoords(r.lhs);
             pts.forEach(p => addPt(code, p));
+
+            // Debug logging for Area 63
+            if (code === 'AREA-63') {
+              console.log(`Area 63 'of' rule: lhs="${r.lhs}", resolved to ${pts.length} points:`, pts.map(p => p.name));
+            }
 
             if (pts.length >= 2) {
               d.lhs = extendLine(pts.map(p => p.coord), ring);
@@ -1297,8 +1329,8 @@
           return d;
         });
 
-        // Sample the area at lower resolution for validation (80x80 grid)
-        const samples = samplePts(ring, 80);
+        // Sample the area at higher resolution for validation (100x100 grid)
+        const samples = samplePts(ring, 100);
 
         // Check each point to see how many zones it belongs to
         const zoneCounts = new Array(samples.length).fill(0);
@@ -1463,7 +1495,7 @@
           return d;
         });
 
-        const samples = samplePts(ring, 80);
+        const samples = samplePts(ring, 100);
 
         samples.forEach(p => {
           let zoneCount = 0;
