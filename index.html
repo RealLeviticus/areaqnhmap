@@ -317,11 +317,11 @@
   </div>
 
   <!-- Debug UI -->
-  <button id="debugBtn" title="Toggle Debug Panel">🐛</button>
+  <!-- <button id="debugBtn" title="Toggle Debug Panel">🐛</button>
   <div id="debugPanel">
     <h3>Zone Validation</h3>
     <div id="debugContent">Click to run validation...</div>
-  </div>
+  </div> -->
 
   <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
   <script>
@@ -334,7 +334,7 @@
     const showWarning = msg => {
       if (IS_SCREENSHOT) return;
       if (msg) {
-        console.warn(msg);
+        // console.warn(msg);
         $('statusDot').className = 'status-dot error';
       }
     };
@@ -518,7 +518,7 @@
           });
         });
       } catch (e) {
-        console.error(e);
+        // console.error(e);
       }
     }
 
@@ -561,7 +561,7 @@
         $('statusDot').className = 'status-dot';
         $('validityText').textContent = v ? `Valid: ${v.valid} | Issued: ${v.issued}` : 'Data loaded';
       } catch (e) {
-        console.error(e);
+        // console.error(e);
         $('validityText').textContent = 'Failed';
         showWarning('Failed to fetch QNH data');
       }
@@ -1000,16 +1000,16 @@
         const samples = samplePts(ring, 200);
 
         // Debug logging for Area 30, Area 65, Area 66, and Area 68 rules
-        if (code === 'AREA-30' || code === 'AREA-65' || code === 'AREA-66' || code === 'AREA-68') {
-          console.log(`${code} has ${rules.length} rules:`);
-          rules.forEach((r, idx) => {
-            console.log(`  Rule ${idx}: type=${r.type}, dir=${r.dir || 'n/a'}, qnh=${r.qnh}, lhs="${r.lhs}", rhs="${r.rhs || 'n/a'}"`);
-            const rd = ruleData[idx];
-            if (rd.lhs) console.log(`    lhs coords: ${rd.lhs.length} points`);
-            if (rd.rhs) console.log(`    rhs coords: ${rd.rhs.length} points`);
-          });
-          console.log(`  Total sample points: ${samples.length}`);
-        }
+        // if (code === 'AREA-30' || code === 'AREA-65' || code === 'AREA-66' || code === 'AREA-68') {
+        //   console.log(`${code} has ${rules.length} rules:`);
+        //   rules.forEach((r, idx) => {
+        //     console.log(`  Rule ${idx}: type=${r.type}, dir=${r.dir || 'n/a'}, qnh=${r.qnh}, lhs="${r.lhs}", rhs="${r.rhs || 'n/a'}"`);
+        //     const rd = ruleData[idx];
+        //     if (rd.lhs) console.log(`    lhs coords: ${rd.lhs.length} points`);
+        //     if (rd.rhs) console.log(`    rhs coords: ${rd.rhs.length} points`);
+        //   });
+        //   console.log(`  Total sample points: ${samples.length}`);
+        // }
 
         rules.forEach((r, i) => {
           if (!r.qnh) return;
@@ -1048,9 +1048,9 @@
               return true;
             });
 
-            if (code === 'AREA-30' || code === 'AREA-68') {
-              console.log(`  Zone ${i} (${r.dir} OF): ${onSideCount} on ${r.dir} side, ${excludedCount} excluded by priority, ${zone.length} final`);
-            }
+            // if (code === 'AREA-30' || code === 'AREA-68') {
+            //   console.log(`  Zone ${i} (${r.dir} OF): ${onSideCount} on ${r.dir} side, ${excludedCount} excluded by priority, ${zone.length} final`);
+            // }
           } else if (r.type === 'between' && d.lhs && d.rhs) {
             // Use simple between-lines checking, but exclude points in other zones
             let betweenCount = 0;
@@ -1084,9 +1084,9 @@
               return true;
             });
 
-            if (code === 'AREA-30' || code === 'AREA-68') {
-              console.log(`  Zone ${i} (BETWEEN): ${betweenCount} between lines, ${excludedCount} excluded by priority, ${zone.length} final`);
-            }
+            // if (code === 'AREA-30' || code === 'AREA-68') {
+            //   console.log(`  Zone ${i} (BETWEEN): ${betweenCount} between lines, ${excludedCount} excluded by priority, ${zone.length} final`);
+            // }
           } else if (r.type === 'rest') {
             zone = samples.filter(p => {
               // CRITICAL: Point must be inside the area polygon
@@ -1110,15 +1110,15 @@
           }
 
           // Debug logging for empty zones
-          if (zone.length === 0 && (code === 'AREA-30' || code === 'AREA-68')) {
-            console.warn(`${code} Zone ${i}: ${r.type} ${r.dir || ''} QNH=${r.qnh} - EMPTY (0 points)`);
-          }
+          // if (zone.length === 0 && (code === 'AREA-30' || code === 'AREA-68')) {
+          //   console.warn(`${code} Zone ${i}: ${r.type} ${r.dir || ''} QNH=${r.qnh} - EMPTY (0 points)`);
+          // }
 
           if (zone.length) {
             // Debug logging for Area 30 and Area 68
-            if (code === 'AREA-30' || code === 'AREA-68') {
-              console.log(`${code} Zone ${i}: ${r.type} ${r.dir || ''} QNH=${r.qnh} - ${zone.length} points`);
-            }
+            // if (code === 'AREA-30' || code === 'AREA-68') {
+            //   console.log(`${code} Zone ${i}: ${r.type} ${r.dir || ''} QNH=${r.qnh} - ${zone.length} points`);
+            // }
 
             // Collect all split lines for this area
             const allSplitLines = ruleData
@@ -1160,7 +1160,7 @@
 
               // If position is invalid, use centroid as fallback
               if (!isValidPos) {
-                console.warn(`Label position invalid for ${code} ${r.type} zone, using centroid`);
+                // console.warn(`Label position invalid for ${code} ${r.type} zone, using centroid`);
                 labelPos = centroid(zone);
               }
             } else {
@@ -1269,7 +1269,7 @@
 
     // Validate zones for overlaps and gaps
     function validateZones() {
-      console.log('Running zone validation...');
+      // console.log('Running zone validation...');
       const results = { areas: [], totalOverlap: 0, totalGap: 0, splitAreas: 0 };
 
       Object.entries(areaSplits).forEach(([code, rules]) => {
@@ -1413,11 +1413,11 @@
         });
 
         // Log to console with color coding
-        if (overlapPct > 1 || gapPct > 1) {
-          console.warn(`⚠️ ${code}: ${overlapPct.toFixed(1)}% overlaps, ${gapPct.toFixed(1)}% gaps`);
-        } else {
-          console.log(`✓ ${code}: ${overlapPct.toFixed(1)}% overlaps, ${gapPct.toFixed(1)}% gaps`);
-        }
+        // if (overlapPct > 1 || gapPct > 1) {
+        //   console.warn(`⚠️ ${code}: ${overlapPct.toFixed(1)}% overlaps, ${gapPct.toFixed(1)}% gaps`);
+        // } else {
+        //   console.log(`✓ ${code}: ${overlapPct.toFixed(1)}% overlaps, ${gapPct.toFixed(1)}% gaps`);
+        // }
       });
 
       // Calculate averages
@@ -1683,7 +1683,7 @@
             updateDebugPanel();
             renderDebugDots();
           } catch (err) {
-            console.error('Validation error:', err);
+            // console.error('Validation error:', err);
             $('debugContent').innerHTML = `<p style="color: var(--error);">Error: ${err.message}</p>`;
           }
         }, 100);
@@ -1700,12 +1700,12 @@
     }
 
     // Set up debug button
-    document.addEventListener('DOMContentLoaded', () => {
-      const btn = $('debugBtn');
-      if (btn) {
-        btn.addEventListener('click', toggleDebug);
-      }
-    });
+    // document.addEventListener('DOMContentLoaded', () => {
+    //   const btn = $('debugBtn');
+    //   if (btn) {
+    //     btn.addEventListener('click', toggleDebug);
+    //   }
+    // });
 
     // ====== PER-AREA COLORED DOT VISUALIZATION ======
 
@@ -1839,7 +1839,7 @@
         });
       });
 
-      console.log(`Rendering ${dotFeatures.length} colored dots for ${visibleAreaPolygons.size} area(s)`);
+      // console.log(`Rendering ${dotFeatures.length} colored dots for ${visibleAreaPolygons.size} area(s)`);
 
       // Update or create dot layers
       if (map.getSource('zone-dots')) {
@@ -1874,7 +1874,7 @@
 
     // Toggle dots for a specific area
     window.toggleAreaDots = function(areaCode) {
-      console.log(`Toggling dots for ${areaCode}`);
+      // console.log(`Toggling dots for ${areaCode}`);
       // TODO: Implement per-area dot visualization if needed
     };
   </script>
