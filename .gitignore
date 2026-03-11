@@ -10,3 +10,5 @@ node_modules/
 
 # Cloudflare
 .wrangler/
+nul
+.claude/settings.local.json

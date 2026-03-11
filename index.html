@@ -325,8 +325,9 @@
 
   <script src="https://unpkg.com/maplibre-gl@3.6.1/dist/maplibre-gl.js"></script>
   <script>
-    // Screenshot mode (use: index.html?screenshot=1)
-    const IS_SCREENSHOT = new URLSearchParams(location.search).get('screenshot') === '1';
+    // Screenshot mode (supports ?screenshot=1 and legacy ?capture=1)
+    const qs = new URLSearchParams(location.search);
+    const IS_SCREENSHOT = qs.get('screenshot') === '1' || qs.get('capture') === '1';
     if (IS_SCREENSHOT) document.body.classList.add('screenshot');
 
     const $ = id => document.getElementById(id);
@@ -691,44 +692,15 @@
       return cross;
     }
 
-    // Check if point is on the compass-directed side of a line
-    // Uses geometric approach from old working version
+    // Check if point is on the compass-directed side of a line.
+    // Uses the closest segment and maps the requested compass direction to the
+    // segment's left/right side. If the segment is nearly parallel to the
+    // compass direction, fall back to nearest-point projection.
     function isPointOnCompassSideOfLine(point, lineCoords, direction) {
       if (!lineCoords || lineCoords.length < 2) return false;
 
-      // Find the segment of the line closest to the point
-      let closestSegIdx = 0;
-      let minDist = Infinity;
-
-      for (let i = 0; i < lineCoords.length - 1; i++) {
-        const d = distToSeg(point, lineCoords[i], lineCoords[i + 1]);
-        if (d < minDist) {
-          minDist = d;
-          closestSegIdx = i;
-        }
-      }
-
-      const lineStart = lineCoords[closestSegIdx];
-      const lineEnd = lineCoords[closestSegIdx + 1];
-
-      // Calculate signed distance (positive = left of line)
-      const signedDist = signedDistanceToLine(point, lineStart, lineEnd);
-
-      // Calculate the line's direction vector (normalized)
-      const dx = lineEnd[0] - lineStart[0];
-      const dy = lineEnd[1] - lineStart[1];
-      const len = Math.hypot(dx, dy);
-      if (len === 0) return false;
-
-      const ndx = dx / len; // East component
-      const ndy = dy / len; // North component
-
-      // The LEFT perpendicular of the line points in direction (-ndy, ndx)
-      const leftPerpX = -ndy;
-      const leftPerpY = ndx;
-
       // Get compass direction vector
-      let compassVec = [0, 0];
+      let compassVec;
       switch(direction) {
         case 'N':  compassVec = [0, 1]; break;
         case 'S':  compassVec = [0, -1]; break;
@@ -741,21 +713,49 @@
         default: return false;
       }
 
-      // Dot product with compass direction to determine which side faces that direction
-      const dotWithLeft = leftPerpX * compassVec[0] + leftPerpY * compassVec[1];
+      let closestSegIdx = 0;
+      let minDist2 = Infinity;
+      let nearestPoint = null;
 
-      // If dot product is positive, left side faces target direction
-      if (dotWithLeft > 0.1) {
-        return signedDist > 0;
-      } else if (dotWithLeft < -0.1) {
-        return signedDist < 0;
+      for (let i = 0; i < lineCoords.length - 1; i++) {
+        const a = lineCoords[i];
+        const b = lineCoords[i + 1];
+        const dx = b[0] - a[0], dy = b[1] - a[1];
+        const l2 = dx * dx + dy * dy;
+        if (l2 === 0) continue;
+
+        const t = Math.max(0, Math.min(1, ((point[0] - a[0]) * dx + (point[1] - a[1]) * dy) / l2));
+        const q = [a[0] + t * dx, a[1] + t * dy];
+        const d2 = (point[0] - q[0]) ** 2 + (point[1] - q[1]) ** 2;
+
+        if (d2 < minDist2) {
+          minDist2 = d2;
+          closestSegIdx = i;
+          nearestPoint = q;
+        }
       }
 
-      // Line is parallel to direction - use distance from line midpoint
-      const lineMid = [(lineStart[0] + lineEnd[0]) / 2, (lineStart[1] + lineEnd[1]) / 2];
-      const toPoint = [point[0] - lineMid[0], point[1] - lineMid[1]];
-      const dotWithCompass = toPoint[0] * compassVec[0] + toPoint[1] * compassVec[1];
-      return dotWithCompass > 0;
+      const a = lineCoords[closestSegIdx];
+      const b = lineCoords[closestSegIdx + 1];
+      const dx = b[0] - a[0];
+      const dy = b[1] - a[1];
+      const segLen = Math.hypot(dx, dy);
+      if (segLen === 0) return false;
+
+      const leftNormal = [-dy / segLen, dx / segLen];
+      const dotWithLeft = leftNormal[0] * compassVec[0] + leftNormal[1] * compassVec[1];
+      const signedDist = signedDistanceToLine(point, a, b);
+
+      // Segment has a clear compass-facing side.
+      if (Math.abs(dotWithLeft) > 0.1) {
+        return dotWithLeft > 0 ? signedDist > 0 : signedDist < 0;
+      }
+
+      // Segment is almost parallel to requested compass direction.
+      // Use nearest point on the line and compare projected position.
+      const q = nearestPoint || [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      const toPoint = [point[0] - q[0], point[1] - q[1]];
+      return (toPoint[0] * compassVec[0] + toPoint[1] * compassVec[1]) > 0;
     }
 
     // Check if point is between two lines (on opposite sides)
@@ -817,23 +817,27 @@
 
     // Find the best label position within a zone
     // Uses pole of inaccessibility approach - find point furthest from zone edges
+    // Also considers distance to the conceptual zone boundary (centroid displacement)
     function findBestZoneLabel(zone, ring, splitLines) {
       if (!zone || zone.length === 0) return null;
       if (zone.length === 1) return zone[0];
-      
+
+      const ctr = centroid(zone);
+
       // Find the point in the zone that is furthest from all boundaries
       // (both the area ring and any split lines)
+      // Also prefer points closer to the zone centroid to avoid edge cases
       let bestPt = null;
-      let maxMinDist = -Infinity;
-      
+      let maxScore = -Infinity;
+
       for (const pt of zone) {
         let minDist = Infinity;
-        
+
         // Distance to area boundary
         for (let i = 0; i < ring.length - 1; i++) {
           minDist = Math.min(minDist, distToSeg(pt, ring[i], ring[i + 1]));
         }
-        
+
         // Distance to split lines if provided
         if (splitLines) {
           for (const line of splitLines) {
@@ -844,19 +848,24 @@
             }
           }
         }
-        
-        if (minDist > maxMinDist) {
-          maxMinDist = minDist;
+
+        // Penalize points far from centroid — they tend to be on zone edges
+        // that don't match the visual split boundary
+        const distToCentroid = Math.hypot(pt[0] - ctr[0], pt[1] - ctr[1]);
+        const score = minDist - distToCentroid * 0.3;
+
+        if (score > maxScore) {
+          maxScore = score;
           bestPt = pt;
         }
       }
-      
+
       // If we found a point, validate it has reasonable distance from boundaries
       // If not, return centroid as fallback
-      if (bestPt && maxMinDist > 0.01) {
+      if (bestPt && maxScore > 0.01) {
         return bestPt;
       }
-      
+
       // Fallback: centroid of the zone
       return centroid(zone);
     }
@@ -1147,10 +1156,12 @@
           // }
 
           if (zone.length) {
-            // Debug logging for Area 30 and Area 68
-            // if (code === 'AREA-30' || code === 'AREA-68') {
-            //   console.log(`${code} Zone ${i}: ${r.type} ${r.dir || ''} QNH=${r.qnh} - ${zone.length} points`);
-            // }
+            // Debug logging for Area 68
+            if (code === 'AREA-68') {
+              const cx = zone.reduce((s, p) => s + p[0], 0) / zone.length;
+              const cy = zone.reduce((s, p) => s + p[1], 0) / zone.length;
+              console.log(`${code} Zone ${i}: ${r.type} ${r.dir || ''} QNH=${r.qnh} - ${zone.length} points, centroid=[${cx.toFixed(2)}, ${cy.toFixed(2)}]`);
+            }
 
             // Collect all split lines for this area
             const allSplitLines = ruleData
@@ -1198,6 +1209,10 @@
             } else {
               // No label position found, use centroid
               labelPos = centroid(zone);
+            }
+
+            if (code === 'AREA-68') {
+              console.log(`${code} Zone ${i} QNH=${r.qnh} FINAL labelPos=[${labelPos[0].toFixed(2)}, ${labelPos[1].toFixed(2)}]`);
             }
 
             lblF.push({
@@ -1299,6 +1314,35 @@
     let debugMode = false;
     let validationResults = null;
 
+    // Returns true if a point matches a specific non-priority rule geometry.
+    function pointInRuleRaw(point, rule, d) {
+      if (!rule?.qnh) return false;
+      if (rule.type === 'of' && rule.dir && d?.lhs?.length >= 2) {
+        return isPointOnCompassSideOfLine(point, d.lhs, rule.dir);
+      }
+      if (rule.type === 'between' && d?.lhs && d?.rhs) {
+        return isPointBetweenLines(point, d.lhs, d.rhs);
+      }
+      if (rule.type === 'rest') {
+        return true;
+      }
+      return false;
+    }
+
+    // Evaluates point membership across all rules. "REST" means complement of
+    // all explicit OF/BETWEEN matches for that point.
+    function getRuleMembership(point, rules, ruleData) {
+      const membership = rules.map((rule, i) => pointInRuleRaw(point, rule, ruleData[i]));
+      const inExplicitZone = membership.some((inZone, i) => inZone && rules[i]?.type !== 'rest');
+
+      return membership.map((inZone, i) => {
+        const rule = rules[i];
+        if (!rule?.qnh) return false;
+        if (rule.type !== 'rest') return inZone;
+        return !inExplicitZone;
+      });
+    }
+
     // Validate zones for overlaps and gaps
     function validateZones() {
       // console.log('Running zone validation...');
@@ -1335,94 +1379,9 @@
         // Check each point to see how many zones it belongs to
         const zoneCounts = new Array(samples.length).fill(0);
 
-        // Use priority-based assignment - each point belongs to at most one zone
         samples.forEach((p, idx) => {
-          // Find the highest-priority zone this point belongs to
-          for (let i = 0; i < rules.length; i++) {
-            const r = rules[i];
-            if (!r.qnh) continue;
-            const d = ruleData[i];
-            let inZone = false;
-
-            if (r.type === 'of' && r.dir && d.lhs?.length >= 2) {
-              inZone = isPointOnCompassSideOfLine(p, d.lhs, r.dir);
-
-              // Exclude points in higher-priority zones
-              if (inZone) {
-                for (let j = 0; j < i; j++) {
-                  if (!rules[j].qnh) continue;
-                  const o = rules[j], od = ruleData[j];
-
-                  if (o.type === 'of' && o.dir && od.lhs) {
-                    if (isPointOnCompassSideOfLine(p, od.lhs, o.dir)) {
-                      inZone = false;
-                      break;
-                    }
-                  }
-
-                  if (o.type === 'between' && od.lhs && od.rhs) {
-                    if (isPointBetweenLines(p, od.lhs, od.rhs)) {
-                      inZone = false;
-                      break;
-                    }
-                  }
-                }
-              }
-            } else if (r.type === 'between' && d.lhs && d.rhs) {
-              inZone = isPointBetweenLines(p, d.lhs, d.rhs);
-
-              // Exclude points in ALL higher-priority zones
-              if (inZone) {
-                for (let j = 0; j < i; j++) {
-                  if (!rules[j].qnh) continue;
-                  const o = rules[j], od = ruleData[j];
-
-                  if (o.type === 'of' && o.dir && od.lhs) {
-                    if (isPointOnCompassSideOfLine(p, od.lhs, o.dir)) {
-                      inZone = false;
-                      break;
-                    }
-                  }
-
-                  if (o.type === 'between' && od.lhs && od.rhs) {
-                    if (isPointBetweenLines(p, od.lhs, od.rhs)) {
-                      inZone = false;
-                      break;
-                    }
-                  }
-                }
-              }
-            } else if (r.type === 'rest') {
-              // Check if point is in any other defined zone
-              let inOtherZone = false;
-              for (let j = 0; j < rules.length; j++) {
-                if (j === i || !rules[j].qnh) continue;
-                const o = rules[j], od = ruleData[j];
-
-                if (o.type === 'of' && o.dir && od.lhs) {
-                  if (isPointOnCompassSideOfLine(p, od.lhs, o.dir)) {
-                    inOtherZone = true;
-                    break;
-                  }
-                }
-
-                if (o.type === 'between' && od.lhs && od.rhs) {
-                  if (isPointBetweenLines(p, od.lhs, od.rhs)) {
-                    inOtherZone = true;
-                    break;
-                  }
-                }
-              }
-
-              inZone = !inOtherZone;
-            }
-
-            if (inZone) {
-              // Point assigned to this zone, stop checking lower-priority zones
-              zoneCounts[idx]++;
-              break;
-            }
-          }
+          const memberships = getRuleMembership(p, rules, ruleData);
+          zoneCounts[idx] = memberships.filter(Boolean).length;
         });
 
         // Calculate overlap and gap percentages
@@ -1498,87 +1457,7 @@
         const samples = samplePts(ring, 100);
 
         samples.forEach(p => {
-          let zoneCount = 0;
-
-          rules.forEach((r, i) => {
-            if (!r.qnh) return;
-            const d = ruleData[i];
-            let inZone = false;
-
-            if (r.type === 'of' && r.dir && d.lhs?.length >= 2) {
-              inZone = isPointOnCompassSideOfLine(p, d.lhs, r.dir);
-
-              // Exclude points in higher-priority zones
-              if (inZone) {
-                for (let j = 0; j < i; j++) {
-                  if (!rules[j].qnh) continue;
-                  const o = rules[j], od = ruleData[j];
-
-                  if (o.type === 'of' && o.dir && od.lhs) {
-                    if (isPointOnCompassSideOfLine(p, od.lhs, o.dir)) {
-                      inZone = false;
-                      break;
-                    }
-                  }
-
-                  if (o.type === 'between' && od.lhs && od.rhs) {
-                    if (isPointBetweenLines(p, od.lhs, od.rhs)) {
-                      inZone = false;
-                      break;
-                    }
-                  }
-                }
-              }
-            } else if (r.type === 'between' && d.lhs && d.rhs) {
-              inZone = isPointBetweenLines(p, d.lhs, d.rhs);
-
-              // Exclude points in ALL higher-priority zones
-              if (inZone) {
-                for (let j = 0; j < i; j++) {
-                  if (!rules[j].qnh) continue;
-                  const o = rules[j], od = ruleData[j];
-
-                  if (o.type === 'of' && o.dir && od.lhs) {
-                    if (isPointOnCompassSideOfLine(p, od.lhs, o.dir)) {
-                      inZone = false;
-                      break;
-                    }
-                  }
-
-                  if (o.type === 'between' && od.lhs && od.rhs) {
-                    if (isPointBetweenLines(p, od.lhs, od.rhs)) {
-                      inZone = false;
-                      break;
-                    }
-                  }
-                }
-              }
-            } else if (r.type === 'rest') {
-              let inOtherZone = false;
-              for (let j = 0; j < rules.length; j++) {
-                if (j === i || !rules[j].qnh) continue;
-                const o = rules[j], od = ruleData[j];
-
-                if (o.type === 'of' && o.dir && od.lhs) {
-                  if (isPointOnCompassSideOfLine(p, od.lhs, o.dir)) {
-                    inOtherZone = true;
-                    break;
-                  }
-                }
-
-                if (o.type === 'between' && od.lhs && od.rhs) {
-                  if (isPointBetweenLines(p, od.lhs, od.rhs)) {
-                    inOtherZone = true;
-                    break;
-                  }
-                }
-              }
-
-              inZone = !inOtherZone;
-            }
-
-            if (inZone) zoneCount++;
-          });
+          const zoneCount = getRuleMembership(p, rules, ruleData).filter(Boolean).length;
 
           // Add debug dot for overlaps (red) and gaps (blue)
           if (zoneCount > 1) {
@@ -1644,6 +1523,7 @@
     // Update debug panel content
     function updateDebugPanel() {
       const content = $('debugContent');
+      if (!content) return;
 
       if (!validationResults) {
         content.innerHTML = '<p style="color: var(--text-muted);">Running validation...</p>';
@@ -1699,9 +1579,10 @@
 
     // Toggle debug mode
     function toggleDebug() {
-      debugMode = !debugMode;
       const btn = $('debugBtn');
       const panel = $('debugPanel');
+      if (!btn || !panel) return;
+      debugMode = !debugMode;
 
       if (debugMode) {
         btn.classList.add('active');
