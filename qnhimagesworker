@@ -1,0 +1,108 @@
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, HEAD, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+// Updated: AU (Australia), WA (Western Australia), SE (Southeast), NE (Northeast)
+const ALLOWED = ['qnh-au.png', 'qnh-wa.png', 'qnh-se.png', 'qnh-ne.png'];
+
+export default {
+  async fetch(request, env) {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { headers: CORS });
+    }
+
+    const url = new URL(request.url);
+    const path = url.pathname.slice(1);
+
+    try {
+      // Serve image
+      if (path.endsWith('.png')) {
+        const filename = path.toLowerCase();
+        if (!ALLOWED.includes(filename)) {
+          return json({ error: 'Not found' }, 404);
+        }
+
+        const object = await env.QNH_BUCKET.get(filename);
+        if (!object) {
+          return json({ error: 'Image not found' }, 404);
+        }
+
+        const headers = new Headers({
+          ...CORS,
+          'Content-Type': 'image/png',
+          'Cache-Control': 'public, max-age=60',
+          'ETag': object.etag,
+        });
+        if (object.uploaded) {
+          headers.set('Last-Modified', object.uploaded.toUTCString());
+        }
+
+        if (request.method === 'HEAD') {
+          headers.set('Content-Length', object.size);
+          return new Response(null, { headers });
+        }
+        return new Response(object.body, { headers });
+      }
+
+      // Status endpoint
+      if (path === 'status' || path === '') {
+        const images = [];
+        for (const filename of ALLOWED) {
+          const obj = await env.QNH_BUCKET.head(filename);
+          images.push(obj ? {
+            filename,
+            size: obj.size,
+            uploaded: obj.uploaded?.toISOString()
+          } : { filename, available: false });
+        }
+        return json({ status: 'ok', timestamp: new Date().toISOString(), images });
+      }
+
+      // Upload endpoint
+      if (path === 'upload' && request.method === 'POST') {
+        const contentType = request.headers.get('Content-Type') || '';
+        let filename, fileData;
+
+        if (contentType.includes('multipart/form-data')) {
+          const form = await request.formData();
+          const file = form.get('file');
+          if (!file) return json({ error: 'No file' }, 400);
+          filename = (form.get('filename') || file.name || '').toLowerCase();
+          fileData = await file.arrayBuffer();
+        } else {
+          return json({ error: 'Use multipart/form-data' }, 400);
+        }
+
+        if (!ALLOWED.includes(filename)) {
+          return json({ error: 'Invalid filename', allowed: ALLOWED }, 400);
+        }
+
+        // Verify PNG
+        const header = new Uint8Array(fileData.slice(0, 8));
+        const png = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
+        if (!png.every((b, i) => header[i] === b)) {
+          return json({ error: 'Not a valid PNG' }, 400);
+        }
+
+        await env.QNH_BUCKET.put(filename, fileData, {
+          httpMetadata: { contentType: 'image/png' }
+        });
+
+        return json({ success: true, filename, size: fileData.byteLength });
+      }
+
+      return json({ error: 'Not found' }, 404);
+    } catch (e) {
+      return json({ error: e.message }, 500);
+    }
+  }
+};
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data, null, 2), {
+    status,
+    headers: { ...CORS, 'Content-Type': 'application/json' }
+  });
+}

@@ -1,0 +1,69 @@
+export default {
+  async fetch(_req) {
+    const upstream = 'https://www.bom.gov.au/aviation/forecasts/area-qnh/';
+    try {
+      const res = await fetch(upstream, {
+        redirect: 'follow',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          'Referer': 'https://www.bom.gov.au/aviation/',
+        },
+      });
+
+      if (!res.ok) {
+        return new Response(`Upstream error: ${res.status}`, {
+          status: res.status,
+          headers: { 'Access-Control-Allow-Origin': '*' },
+        });
+      }
+
+      let html = await res.text();
+
+      // 🧹 Remove scripts, styles, and tags
+      let text = html
+        .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/g, ' ')
+        .replace(/&amp;/g, '&')
+        .replace(/&lt;/g, '<')
+        .replace(/&gt;/g, '>')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+
+      // 🪄 Extract just the part between "Area 20:" and "Northern Territory" (end of feed)
+      const match = text.match(/(Area\s*20:[\s\S]*?)(?=This page works|Copyright|$)/i);
+      if (match) text = match[1].trim();
+
+      // If still nothing useful, bail out
+      if (!/Area\s*\d+:/i.test(text)) {
+        return new Response('No valid Area QNH data found.', {
+          status: 502,
+          headers: { 'Access-Control-Allow-Origin': '*' },
+        });
+      }
+
+      // Format for readability (newlines before "Area" and after "Valid"/"Issued")
+      text = text
+        .replace(/(Area\s*\d+:)/g, '\n\n$1')
+        .replace(/(Valid:)/g, '\n$1')
+        .replace(/(Issued:)/g, '\n$1')
+        .trim();
+
+      return new Response(text, {
+        status: 200,
+        headers: {
+          'Content-Type': 'text/plain; charset=utf-8',
+          'Access-Control-Allow-Origin': '*',
+          'Cache-Control': 'public, max-age=600',
+        },
+      });
+    } catch (err) {
+      return new Response(`Worker error: ${err.message}`, {
+        status: 500,
+        headers: { 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+  },
+};
