@@ -100,6 +100,11 @@ An area may be clipped in some charts, but every area must be whole in at
 least one; `test/render.test.js` fails if that stops being true. All the
 regional charts share one scale, so labels read the same size on each.
 
+Western Australia and the central strip are each split north/south (`wan`/
+`was`, `cen`/`ces`). Whole, they span nearly 30 degrees of latitude, so they
+rendered as tall thin images that the viewer shrank to fit. Halved, each is
+close to square and readable without opening it full size.
+
 ## Running it
 
 ```bash
@@ -133,7 +138,7 @@ whose zones fail to tile — and exits non-zero, so it can gate a deploy.
 | --- | --- |
 | `/` | the live map |
 | `/static.html` | pre-rendered charts, one per tab |
-| `/images/qnh-{au,wa,ce,se,ne}.png` | the chart images — **this is what vatSys loads** |
+| `/images/qnh-{au,wan,was,cen,ces,ne,se}.png` | the chart images — **this is what vatSys loads** |
 | `/api/qnh` | the parsed forecast as JSON |
 | `/api/airspace` | the cached vatSys airspace dataset |
 | `/api/status` | feed freshness and image render times |

@@ -45,25 +45,40 @@ function viewport([[west, south], [east, north]], targetWidth) {
  */
 const REGION_CONTENTS = {
   au: { name: 'Australia', scale: 0.043, areas: 'all' },
-  wa: {
-    name: 'Western Australia',
-    areas: ['60', '61', '62', '63', '64', '65', '66', '68', '69', '83', '86', '87', '88'],
+
+  // Western Australia and the central strip are each split north/south. Whole
+  // they span nearly 30 degrees of latitude, which forced them to render as
+  // tall thin images that the viewer then shrank to fit -- legible only at
+  // full size. Halved, each chart is close to square and reads at a glance.
+  wan: {
+    name: 'North WA',
+    areas: ['68', '69', '83', '86', '87', '88'],
   },
-  ce: {
-    name: 'Central',
-    areas: ['50', '51', '52', '53', '64', '80', '83', '84', '85', '86'],
+  was: {
+    name: 'South WA',
+    areas: ['60', '61', '62', '63', '64', '65', '66'],
+  },
+  cen: {
+    name: 'North Central',
+    areas: ['80', '83', '84', '86'],
+  },
+  ces: {
+    name: 'South Central',
+    // 64 overlaps South WA; an area may appear on more than one chart.
+    areas: ['50', '51', '52', '53', '64', '85'],
+  },
+
+  ne: {
+    name: 'North East',
+    // Deliberately no 80: including the Top End drags the frame far enough
+    // west to change the chart's character. Area 80 is whole on the North
+    // Central and Australia charts.
+    areas: ['40', '41', '43', '44', '45'],
   },
   se: {
     name: 'South East',
     // 24 reaches 163E (and contains Lord Howe Island); 53 starts at 129E.
     areas: ['20', '21', '22', '24', '30', '50', '51', '52', '53', '70'],
-  },
-  ne: {
-    name: 'North East',
-    // Deliberately no 80: including the Top End drags the frame far enough
-    // west to change the chart's character. Area 80 is whole on the Central
-    // and Australia charts.
-    areas: ['40', '41', '43', '44', '45'],
   },
 };
 
