@@ -160,15 +160,17 @@ body.charts { overflow: hidden; }
   line-height: 0;
 }
 
+/*
+ * No border or background here on purpose. The element fills the stage and
+ * object-fit letterboxes the chart inside it, so a frame would be drawn around
+ * the element rather than around the visible chart, leaving empty panels down
+ * either side. The chart's own ocean reads as its edge.
+ */
 .chart-stage img {
   width: 100%;
   height: 100%;
   object-fit: contain;
   object-position: center;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--bg);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
 }
 
 .placeholder {
