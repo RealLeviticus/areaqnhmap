@@ -1,14 +1,14 @@
-# Cloudflare Worker files
-r2-upload-worker.js
-wrangler.toml
-
-# Documentation
-R2-SETUP.md
-
-# Node modules (if any)
 node_modules/
 
-# Cloudflare
-.wrangler/
-nul
+# Local run state: rendered images and the render bookkeeping file.
+# Anchored to the repo root so it cannot swallow public/data/, which holds
+# the committed basemap and area polygons.
+/data/
+/.devdata/
+
+# Secrets. .env.example documents every setting; .env holds real values.
+.env
+
+# Editor / OS noise
+.DS_Store
 .claude/settings.local.json

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Area QNH Charts</title>
+  <meta name="description"
+    content="Pre-rendered Area QNH charts for Australia, Western Australia, the south east and the north east." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body class="charts">
+  <header>
+    <div class="header-content">
+      <div>
+        <h1>Area QNH Charts</h1>
+        <p class="subtitle">Re-rendered whenever the Bureau issues a new forecast</p>
+      </div>
+      <div id="validity">
+        <span class="status-dot loading" id="statusDot"></span>
+        <span id="validityText">Loading…</span>
+      </div>
+      <nav class="nav-links">
+        <a href="index.html">← Live map</a>
+      </nav>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" role="tablist" aria-label="Chart region"></nav>
+
+  <main class="chart-stage" id="stage">
+    <p class="placeholder">Loading charts…</p>
+  </main>
+
+  <footer>
+    <span id="renderedAt"></span>
+    <span class="spacer"></span>
+    <span>Direct image URL: <code id="directUrl">—</code></span>
+    <button type="button" id="copyUrl" class="link-button">Copy</button>
+  </footer>
+
+  <script type="module">
+    /**
+     * One chart at a time, as large as the window allows.
+     *
+     * The region lives in the URL hash so a particular chart can be linked or
+     * bookmarked -- which also gives vatSys (and anything else that just wants a
+     * PNG) a stable per-region page to point a user at, alongside the direct
+     * /images/qnh-<code>.png URL shown in the footer.
+     */
+    const tabs = document.getElementById('tabs');
+    const stage = document.getElementById('stage');
+    const statusDot = document.getElementById('statusDot');
+    const validityText = document.getElementById('validityText');
+    const renderedAt = document.getElementById('renderedAt');
+    const directUrl = document.getElementById('directUrl');
+    const copyUrl = document.getElementById('copyUrl');
+
+    const UTC = new Intl.DateTimeFormat('en-AU', {
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
+      day: 'numeric', month: 'short', timeZone: 'UTC',
+    });
+    const stamp = iso => (iso ? `${UTC.format(new Date(iso))} UTC` : '—');
+
+    let images = {};
+    let current = location.hash.replace('#', '') || null;
+
+    function renderTabs() {
+      tabs.replaceChildren(...Object.entries(images).map(([code, image]) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.role = 'tab';
+        button.className = 'tab' + (code === current ? ' active' : '');
+        button.setAttribute('aria-selected', String(code === current));
+        button.textContent = image.region ?? code.toUpperCase();
+        if (image.available === false) {
+          button.classList.add('missing');
+          button.title = 'Not generated yet';
+        }
+        button.addEventListener('click', () => select(code));
+        return button;
+      }));
+    }
+
+    function renderStage() {
+      const image = images[current];
+      if (!image) {
+        stage.replaceChildren(Object.assign(document.createElement('p'),
+          { className: 'placeholder', textContent: 'No charts available yet.' }));
+        directUrl.textContent = '—';
+        return;
+      }
+
+      const href = `images/${image.name}`;
+      directUrl.textContent = new URL(href, location.href).href;
+
+      if (image.available === false) {
+        stage.replaceChildren(Object.assign(document.createElement('p'), {
+          className: 'placeholder',
+          textContent: 'This chart has not been generated yet. It is rendered shortly after the service starts, and again whenever the forecast changes.',
+        }));
+        return;
+      }
+
+      const link = document.createElement('a');
+      // Opening the raw PNG is the quickest way to get a full-resolution copy.
+      link.href = href;
+      link.target = '_blank';
+      link.rel = 'noopener';
+      link.title = 'Open the full-size image';
+
+      const img = document.createElement('img');
+      // Cache-bust on the render time so an unchanged chart stays cached.
+      img.src = `${href}?v=${encodeURIComponent(image.modified ?? '')}`;
+      img.alt = `Area QNH chart — ${image.region ?? current}`;
+      link.append(img);
+
+      stage.replaceChildren(link);
+    }
+
+    function select(code) {
+      current = code;
+      history.replaceState(null, '', `#${code}`);
+      renderTabs();
+      renderStage();
+    }
+
+    async function load() {
+      statusDot.className = 'status-dot loading';
+      validityText.textContent = 'Fetching…';
+
+      try {
+        const [statusRes, qnhRes] = await Promise.all([fetch('/api/status'), fetch('/api/qnh')]);
+        if (!statusRes.ok) throw new Error(`status HTTP ${statusRes.status}`);
+
+        const status = await statusRes.json();
+        const shots = status.screenshots ?? {};
+        images = shots.images ?? {};
+
+        // Prefer whatever the hash asked for, then the first chart that exists.
+        if (!images[current]) {
+          current = Object.keys(images).find(c => images[c].available !== false)
+            ?? Object.keys(images)[0]
+            ?? null;
+        }
+
+        renderTabs();
+        renderStage();
+        renderedAt.textContent = shots.renderedAt ? `Rendered ${stamp(shots.renderedAt)}` : '';
+
+        if (qnhRes.ok) {
+          const qnh = await qnhRes.json();
+          const amd = qnh.amended ? 'AMD ' : '';
+          validityText.textContent =
+            `${amd}Valid ${stamp(qnh.validFrom)} – ${stamp(qnh.validTo)} · Issued ${stamp(qnh.issued)}`;
+          statusDot.className = qnh.stale ? 'status-dot error' : 'status-dot';
+        } else {
+          validityText.textContent = 'Forecast unavailable';
+          statusDot.className = 'status-dot error';
+        }
+      } catch (err) {
+        validityText.textContent = `Unavailable (${err.message})`;
+        statusDot.className = 'status-dot error';
+        stage.replaceChildren(Object.assign(document.createElement('p'),
+          { className: 'placeholder', textContent: `Could not load charts: ${err.message}` }));
+      }
+    }
+
+    copyUrl.addEventListener('click', async () => {
+      if (directUrl.textContent === '—') return;
+      try {
+        await navigator.clipboard.writeText(directUrl.textContent);
+        copyUrl.textContent = 'Copied';
+        setTimeout(() => { copyUrl.textContent = 'Copy'; }, 1500);
+      } catch {
+        copyUrl.textContent = 'Copy failed';
+        setTimeout(() => { copyUrl.textContent = 'Copy'; }, 1500);
+      }
+    });
+
+    window.addEventListener('hashchange', () => {
+      const code = location.hash.replace('#', '');
+      if (images[code]) select(code);
+    });
+
+    load();
+    setInterval(load, 5 * 60 * 1000);
+  </script>
+</body>
+
+</html>

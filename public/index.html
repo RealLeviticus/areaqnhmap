@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Area QNH Map</title>
+  <meta name="description"
+    content="Australian Area QNH forecasts from the Bureau of Meteorology, drawn on a map." />
+  <link rel="icon" href="favicon.ico" />
+  <link rel="stylesheet" href="/vendor/maplibre-gl.css" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body>
+  <header>
+    <div class="header-content">
+      <div>
+        <h1>Area QNH Map</h1>
+        <p class="subtitle">Australian aviation altimeter setting regions</p>
+      </div>
+      <div id="validity">
+        <span class="status-dot loading" id="statusDot"></span>
+        <span id="validityText">Loading…</span>
+      </div>
+      <nav class="nav-links">
+        <a href="static.html">Static images →</a>
+      </nav>
+    </div>
+  </header>
+
+  <div id="map"></div>
+
+  <footer>
+    Forecast data © <a href="https://www.bom.gov.au/aviation/forecasts/area-qnh/"
+      rel="noopener">Bureau of Meteorology</a>.
+    Coastline from Natural Earth.
+    <strong>Not for operational use</strong> — always check the Bureau or NAIPS before flight.
+  </footer>
+
+  <script src="/vendor/maplibre-gl.js"></script>
+  <script type="module" src="js/map.js"></script>
+</body>
+
+</html>

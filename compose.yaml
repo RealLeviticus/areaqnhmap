@@ -1,0 +1,25 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      DATA_DIR: /data
+    # Bound to loopback: Caddy on the host terminates TLS and proxies in,
+    # matching how the other services on this VPS are exposed.
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      # Rendered PNGs survive a rebuild, so a redeploy doesn't blank the
+      # static image page until the next forecast lands.
+      - images:/data
+    # Chromium's renderer wants more than Docker's default 64 MB of shared
+    # memory; without this the screenshot job dies part-way through a page.
+    shm_size: 512mb
+
+volumes:
+  images:

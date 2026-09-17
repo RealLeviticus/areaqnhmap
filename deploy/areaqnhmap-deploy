@@ -1,0 +1,41 @@
+#!/bin/bash
+# Pulls origin/main and redeploys if it moved. Health-gated: if the new build
+# doesn't answer /healthz within ~60s, it rolls back to the previous commit and
+# rebuilds, so a bad push degrades to "still serving the old code" rather than
+# "map down".
+#
+# Installed to /usr/local/bin/areaqnhmap-deploy and driven by a systemd timer;
+# see deploy/README.md. Mirrors the ozserver-deploy script already on this host.
+set -euo pipefail
+APP=/opt/areaqnhmap
+
+exec 9>/home/ubuntu/.areaqnhmap-deploy.lock
+flock -n 9 || { echo "deploy already in progress; skipping"; exit 0; }
+
+cd "$APP"
+git fetch --quiet origin main
+PREV=$(git rev-parse HEAD)
+NEXT=$(git rev-parse origin/main)
+[ "$PREV" = "$NEXT" ] && exit 0
+
+echo "deploying ${PREV:0:7} -> ${NEXT:0:7}"
+git reset --hard --quiet "$NEXT"
+
+redeploy() {
+  docker compose build --quiet
+  docker compose up -d
+}
+redeploy
+
+for i in $(seq 1 20); do
+  if curl -fsS -m 5 http://127.0.0.1:8080/healthz 2>/dev/null | grep -q ok; then
+    echo "deployed ${NEXT:0:7} OK"
+    exit 0
+  fi
+  sleep 3
+done
+
+echo "HEALTH CHECK FAILED - rolling back to ${PREV:0:7}"
+git reset --hard --quiet "$PREV"
+redeploy
+exit 1

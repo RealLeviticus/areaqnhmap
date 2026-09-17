@@ -1,0 +1,8 @@
+[Unit]
+Description=Pull and redeploy the Area QNH map if origin/main moved
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+ExecStart=/usr/local/bin/areaqnhmap-deploy

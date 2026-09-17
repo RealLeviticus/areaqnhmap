@@ -1,0 +1,9 @@
+# The repo is edited on Windows and runs on Linux. Normalise to LF in the
+# index so that shell scripts, which a CRLF would break outright
+# ("bad interpreter: /bin/bash^M"), are always checked out correctly.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending converted.
+*.png binary
+*.ico binary
+*.pbf binary

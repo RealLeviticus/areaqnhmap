@@ -1,0 +1,204 @@
+:root {
+  --bg: #ffffff;
+  --border: #d9dde1;
+  --text: #14181c;
+  --text-muted: #5b6670;
+  --accent: #1f6feb;
+  --ok: #2ea043;
+  --error: #d1242f;
+  --warning: #bf8700;
+  --surface: #f7f9fa;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body { height: 100%; }
+
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  flex-shrink: 0;
+  padding: 10px 18px;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+}
+
+h1 { font-size: 1.05rem; font-weight: 600; letter-spacing: -0.01em; }
+
+.subtitle { font-size: 0.78rem; color: var(--text-muted); }
+
+#validity {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--ok);
+  flex-shrink: 0;
+}
+
+.status-dot.loading { background: var(--warning); animation: pulse 1.2s ease-in-out infinite; }
+.status-dot.error { background: var(--error); }
+
+@keyframes pulse { 50% { opacity: 0.35; } }
+
+.nav-links a {
+  font-size: 0.8rem;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.nav-links a:hover { text-decoration: underline; }
+
+#map { flex: 1 1 auto; min-height: 0; background: #dfe8f0; }
+
+footer {
+  flex-shrink: 0;
+  padding: 6px 18px;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+footer a { color: var(--accent); }
+
+/*
+ * Screenshot mode: the renderer captures #map alone, but hiding the chrome
+ * removes any chance of a scrollbar or a reflow shifting the canvas mid-capture.
+ */
+body.screenshot header,
+body.screenshot footer { display: none; }
+body.screenshot #map { height: 100vh; }
+
+/* ---- Chart viewer (static.html) ---- */
+
+/*
+ * The chart is the page. Header, tabs and footer are fixed-height, and the
+ * stage takes whatever is left, so the image is always as large as it can be
+ * without the window scrolling.
+ */
+body.charts { overflow: hidden; }
+
+.tabs {
+  flex-shrink: 0;
+  display: flex;
+  gap: 2px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  overflow-x: auto;
+}
+
+.tab {
+  font: inherit;
+  font-size: 0.82rem;
+  padding: 9px 16px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.tab:hover { color: var(--text); background: rgba(0, 0, 0, 0.03); }
+
+.tab.active {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+
+.tab.missing { opacity: 0.45; }
+
+.chart-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  background: var(--surface);
+}
+
+.chart-stage a {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  line-height: 0;
+}
+
+/*
+ * object-fit keeps the chart's aspect ratio while letting it shrink to fit
+ * either dimension, so a tall region (WA) and a wide one (Australia) both fill
+ * as much of the stage as they can.
+ */
+.chart-stage img {
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+}
+
+.placeholder {
+  max-width: 44ch;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+footer .spacer { flex: 1 1 auto; }
+
+footer code {
+  font-size: 0.68rem;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  user-select: all;
+}
+
+.link-button {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+body.charts footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}

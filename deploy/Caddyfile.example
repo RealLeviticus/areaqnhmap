@@ -1,0 +1,27 @@
+# Add this block to /etc/caddy/Caddyfile, then: sudo systemctl reload caddy
+#
+# Cloudflare sits in front (orange cloud), so this only ever sees Cloudflare's
+# IPs. Caddy still gets its own certificate, which keeps the origin encrypted
+# and lets the site work if the record is ever switched to DNS-only.
+areaqnh.actuallyleviticus.xyz {
+	encode zstd gzip
+
+	# The chart PNGs are the one thing vatSys fetches directly, and it does so
+	# from a desktop app with no Origin header. CORS is set wide here so that
+	# stays true no matter how the app is packaged.
+	handle /images/* {
+		header Access-Control-Allow-Origin "*"
+		header Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	# The JSON API is useful to other tools; same reasoning.
+	handle /api/* {
+		header Access-Control-Allow-Origin "*"
+		reverse_proxy 127.0.0.1:8080
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:8080
+	}
+}
