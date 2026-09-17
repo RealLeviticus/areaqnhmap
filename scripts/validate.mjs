@@ -22,6 +22,7 @@ import * as cheerio from 'cheerio';
 import {
   samplePts, extendLine, ruleIndexForPoint, resolveRulePolygons,
 } from '../public/js/geometry.js';
+import { REGIONS } from '../src/screenshots.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -192,6 +193,40 @@ for (const area of Object.values(forecast.areas)) {
     }
   });
 }
+
+/**
+ * Every area must appear in full in at least one chart.
+ *
+ * Being clipped in one region is fine -- that is what the regional crops are
+ * for -- but an area that is cut off in all four can never be read properly,
+ * which is how Area 24 (which reaches 163E, further east than any region went)
+ * slipped through.
+ */
+function checkRegionCoverage() {
+  for (const feature of areas.features) {
+    const code = feature.properties.area_code.replace('AREA-', '');
+    const ring = feature.geometry.coordinates[0];
+
+    let w = Infinity; let e = -Infinity; let s = Infinity; let n = -Infinity;
+    for (const [lon, lat] of ring) {
+      w = Math.min(w, lon); e = Math.max(e, lon);
+      s = Math.min(s, lat); n = Math.max(n, lat);
+    }
+
+    const fits = Object.entries(REGIONS).filter(([, region]) => {
+      const [[rw, rs], [re, rn]] = region.bounds;
+      return w >= rw && e <= re && s >= rs && n <= rn;
+    });
+
+    if (!fits.length) {
+      problems.push(
+        `AREA ${code}: clipped in every chart (spans ${w.toFixed(1)}E-${e.toFixed(1)}E, ` +
+        `${s.toFixed(1)}-${n.toFixed(1)}); widen a region in src/screenshots.js`);
+    }
+  }
+}
+
+checkRegionCoverage();
 
 function describe(rule) {
   if (rule.type === 'of') return `${rule.dir} OF ${rule.lhs}`;

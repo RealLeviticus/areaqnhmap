@@ -144,24 +144,27 @@ body.charts { overflow: hidden; }
   background: var(--surface);
 }
 
+/*
+ * The link fills the stage and the image fits inside it with object-fit.
+ *
+ * The obvious `max-height: 100%` on the image alone does not work: it resolves
+ * against this anchor, whose own height is auto, so it computes to none and the
+ * image renders at its natural size and overflows. Giving the anchor a definite
+ * height and letting object-fit do the scaling avoids that entirely, and keeps
+ * the aspect ratio for both a tall region (WA) and a wide one (Australia).
+ */
 .chart-stage a {
   display: block;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   line-height: 0;
 }
 
-/*
- * object-fit keeps the chart's aspect ratio while letting it shrink to fit
- * either dimension, so a tall region (WA) and a wide one (Australia) both fill
- * as much of the stage as they can.
- */
 .chart-stage img {
-  max-width: 100%;
-  max-height: 100%;
-  width: auto;
-  height: auto;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
+  object-position: center;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg);
