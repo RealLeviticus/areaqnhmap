@@ -36,7 +36,9 @@ function viewport([[west, south], [east, north]], targetWidth) {
  */
 const REGION_BOUNDS = {
   au: { name: 'Australia', bounds: [[110, -45], [157, -8]], width: 1100 },
-  wa: { name: 'Western Australia', bounds: [[110, -37], [132, -11]], width: 900 },
+  // Reaches to 8S so Area 86 (Timor Sea) is whole, and east to 137E so the
+  // central areas 84/85 are in frame rather than cut at the WA border.
+  wa: { name: 'Western Australia', bounds: [[110, -37], [137, -8]], width: 1000 },
   se: { name: 'South East', bounds: [[131, -45], [156, -26]], width: 1000 },
   ne: { name: 'North East', bounds: [[135, -31], [157, -8]], width: 1000 },
 };
