@@ -8,7 +8,7 @@
  * no CI, no object store, no bot commits, and the renderer is always looking at
  * exactly the code it was deployed with.
  */
-import { mkdir, readFile, writeFile, rename, stat, readdir } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, stat, readdir, unlink } from 'node:fs/promises';
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
@@ -223,8 +223,36 @@ export async function renderAll(baseUrl, { log = console.log } = {}) {
     await browser.close();
   }
 
+  await removeOrphanImages(log);
   log(`[render] wrote ${written.length} image(s)`);
   return written;
+}
+
+/**
+ * Delete chart images for regions that no longer exist.
+ *
+ * The images live on a volume that outlives any one deploy, so splitting or
+ * renaming a region would otherwise leave the old PNG behind forever - still
+ * on disk, never refreshed, and no longer reachable through the route.
+ */
+async function removeOrphanImages(log = console.log) {
+  const expected = new Set(REGION_CODES.map(imageName));
+  let files;
+  try {
+    files = await readdir(imagesDir);
+  } catch {
+    return;
+  }
+
+  for (const file of files) {
+    if (!/^qnh-[a-z]+.png$/.test(file) || expected.has(file)) continue;
+    try {
+      await unlink(join(imagesDir, file));
+      log(`[render] removed orphaned ${file}`);
+    } catch {
+      // A file we can't delete is untidy, not fatal.
+    }
+  }
 }
 
 /**
