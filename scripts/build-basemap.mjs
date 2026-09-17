@@ -25,7 +25,29 @@ const PRECISION = 3; // ~110 m at the equator; far finer than this map ever rend
 const SOURCES = {
   land: 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_land.geojson',
   states: 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_1_states_provinces_lines.geojson',
+  // 10m land, not minor_islands: Lord Howe is in the former and absent from the latter.
+  islands: 'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_10m_land.geojson',
 };
+
+/**
+ * Small islands that matter for an Area QNH chart but are too small to survive
+ * 1:50m generalisation. Lord Howe is the reason this exists: it sits inside
+ * Area 24 and has its own chart, which would otherwise be empty ocean.
+ *
+ * Only the 10m geometry inside these windows is merged in, so the file stays
+ * small rather than carrying the whole 10m dataset.
+ */
+const DETAIL_WINDOWS = [
+  { name: 'Lord Howe Island', minLon: 158.7, maxLon: 159.4, minLat: -31.9, maxLat: -31.3 },
+  { name: 'Norfolk Island', minLon: 167.6, maxLon: 168.2, minLat: -29.3, maxLat: -28.8 },
+  { name: 'Christmas Island', minLon: 105.4, maxLon: 105.8, minLat: -10.6, maxLat: -10.3 },
+  { name: 'Cocos (Keeling) Islands', minLon: 96.7, maxLon: 97.0, minLat: -12.3, maxLat: -11.8 },
+  { name: 'Macquarie Island', minLon: 158.7, maxLon: 159.1, minLat: -54.8, maxLat: -54.4 },
+];
+
+const inDetailWindow = ring => ring.some(([lon, lat]) =>
+  DETAIL_WINDOWS.some(w =>
+    lon >= w.minLon && lon <= w.maxLon && lat >= w.minLat && lat <= w.maxLat));
 
 async function getJSON(url) {
   process.stderr.write(`fetching ${url}\n`);
@@ -91,7 +113,32 @@ function collect(fc, keep = () => true) {
 // borders, which are just noise on an Australian chart.
 const australianOnly = p => p.adm0_a3 === 'AUS' || p.ADM0_A3 === 'AUS';
 
-const [landRaw, statesRaw] = await Promise.all([getJSON(SOURCES.land), getJSON(SOURCES.states)]);
+const [landRaw, statesRaw, islandsRaw] = await Promise.all([
+  getJSON(SOURCES.land), getJSON(SOURCES.states), getJSON(SOURCES.islands),
+]);
+
+/** 10m island geometry, kept only where it falls in a detail window. */
+function collectIslands(fc) {
+  const features = [];
+  for (const f of fc.features ?? []) {
+    const geom = f.geometry ?? {};
+    const polys = geom.type === 'Polygon' ? [geom.coordinates]
+      : geom.type === 'MultiPolygon' ? geom.coordinates : [];
+
+    const kept = polys
+      .map(poly => poly.filter(inDetailWindow).map(roundRing).filter(r => r.length >= 4))
+      .filter(poly => poly.length);
+
+    if (kept.length) {
+      features.push({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'MultiPolygon', coordinates: kept },
+      });
+    }
+  }
+  return features;
+}
 
 const basemap = {
   generated: new Date().toISOString().slice(0, 10),
@@ -100,6 +147,10 @@ const basemap = {
   land: collect(landRaw),
   states: collect(statesRaw, australianOnly),
 };
+
+// Merge the small islands into the land layer so they render identically.
+const islands = collectIslands(islandsRaw);
+basemap.land.features.push(...islands);
 
 mkdirSync(dirname(OUT), { recursive: true });
 writeFileSync(OUT, JSON.stringify(basemap));

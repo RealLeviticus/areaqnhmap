@@ -9,6 +9,7 @@
  * exactly the code it was deployed with.
  */
 import { mkdir, readFile, writeFile, rename, stat, readdir } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import puppeteer from 'puppeteer-core';
@@ -32,25 +33,77 @@ function viewport([[west, south], [east, north]], targetWidth) {
 }
 
 /**
- * Regions to render, framed the way BOM frames its own chart set.
- * bounds: [[west, south], [east, north]]
+ * Which Area QNH zones each chart must show in full.
+ *
+ * Bounds are derived from these lists rather than hand-tuned, because nudging
+ * a corner by eye is how areas kept ending up half cut off: widening a chart
+ * to rescue one area quietly clipped another. Listing the areas states the
+ * intent, and the frame follows from the polygons.
+ *
+ * An area may be clipped in some charts as long as one chart shows it whole;
+ * test/render.test.js enforces that.
  */
-const REGION_BOUNDS = {
-  au: { name: 'Australia', bounds: [[110, -45], [157, -8]], width: 1100 },
-  // Reaches to 8S so Area 86 (Timor Sea) is whole, and east to 137E so the
-  // central areas 84/85 are in frame rather than cut at the WA border.
-  wa: { name: 'Western Australia', bounds: [[110, -37], [137, -8]], width: 1000 },
-  // East to 164E so Area 24, the oceanic area off NSW, is whole somewhere;
-  // it reaches 163E and was clipped in every other region.
-  se: { name: 'South East', bounds: [[131, -45], [164, -26]], width: 1200 },
-  ne: { name: 'North East', bounds: [[135, -31], [157, -8]], width: 1000 },
+const REGION_CONTENTS = {
+  au: { name: 'Australia', scale: 0.043, areas: 'all' },
+  wa: {
+    name: 'Western Australia',
+    areas: ['60', '61', '62', '63', '64', '65', '66', '68', '69', '83', '86', '87', '88'],
+  },
+  ce: {
+    name: 'Central',
+    areas: ['50', '51', '52', '53', '64', '80', '83', '84', '85', '86'],
+  },
+  se: {
+    name: 'South East',
+    // 24 reaches 163E (and contains Lord Howe Island); 53 starts at 129E.
+    areas: ['20', '21', '22', '24', '30', '50', '51', '52', '53', '70'],
+  },
+  ne: {
+    name: 'North East',
+    // Deliberately no 80: including the Top End drags the frame far enough
+    // west to change the chart's character. Area 80 is whole on the Central
+    // and Australia charts.
+    areas: ['40', '41', '43', '44', '45'],
+  },
 };
 
+/** Breathing room around the areas, in degrees, so labels aren't cut. */
+const MARGIN = 1.1;
+
+/** Degrees of longitude per pixel. Shared so every detail chart reads alike. */
+const DETAIL_SCALE = 0.027;
+
+function boundsFor(areaCodes, areasGeoJSON) {
+  const wanted = areaCodes === 'all'
+    ? null
+    : new Set(areaCodes.map(code => `AREA-${code}`));
+
+  let w = Infinity; let e = -Infinity; let s = Infinity; let n = -Infinity;
+  for (const feature of areasGeoJSON.features) {
+    if (wanted && !wanted.has(feature.properties.area_code)) continue;
+    for (const [lon, lat] of feature.geometry.coordinates[0]) {
+      w = Math.min(w, lon); e = Math.max(e, lon);
+      s = Math.min(s, lat); n = Math.max(n, lat);
+    }
+  }
+
+  return [
+    [round(w - MARGIN), round(s - MARGIN)],
+    [round(e + MARGIN), round(n + MARGIN)],
+  ];
+}
+
+const round = v => Math.round(v * 10) / 10;
+
+const AREAS = JSON.parse(
+  readFileSync(new URL('../public/data/areas.json', import.meta.url), 'utf8'));
+
 export const REGIONS = Object.fromEntries(
-  Object.entries(REGION_BOUNDS).map(([code, region]) => [
-    code,
-    { ...region, ...viewport(region.bounds, region.width) },
-  ]));
+  Object.entries(REGION_CONTENTS).map(([code, region]) => {
+    const bounds = boundsFor(region.areas, AREAS);
+    const width = Math.round((bounds[1][0] - bounds[0][0]) / (region.scale ?? DETAIL_SCALE));
+    return [code, { name: region.name, bounds, ...viewport(bounds, width) }];
+  }));
 
 export const REGION_CODES = Object.keys(REGIONS);
 export const imageName = code => `qnh-${code}.png`;

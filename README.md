@@ -89,6 +89,17 @@ a working site to lose when one changes its terms.
 
 To refresh the coastline: `npm run build:basemap`.
 
+### Chart framing
+
+Each chart declares *which areas it must show in full*, and its bounds are
+derived from those polygons (`REGION_CONTENTS` in `src/screenshots.js`).
+Nudging a corner by eye is how areas kept ending up half cut off — widening a
+chart to rescue one area would quietly clip another.
+
+An area may be clipped in some charts, but every area must be whole in at
+least one; `test/render.test.js` fails if that stops being true. All the
+regional charts share one scale, so labels read the same size on each.
+
 ## Running it
 
 ```bash
@@ -122,7 +133,7 @@ whose zones fail to tile — and exits non-zero, so it can gate a deploy.
 | --- | --- |
 | `/` | the live map |
 | `/static.html` | pre-rendered charts, one per tab |
-| `/images/qnh-{au,wa,se,ne}.png` | the chart images — **this is what vatSys loads** |
+| `/images/qnh-{au,wa,ce,se,ne}.png` | the chart images — **this is what vatSys loads** |
 | `/api/qnh` | the parsed forecast as JSON |
 | `/api/airspace` | the cached vatSys airspace dataset |
 | `/api/status` | feed freshness and image render times |
