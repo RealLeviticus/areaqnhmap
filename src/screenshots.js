@@ -9,6 +9,7 @@
  * exactly the code it was deployed with.
  */
 import { mkdir, readFile, writeFile, rename, stat, readdir } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import puppeteer from 'puppeteer-core';
 
@@ -53,6 +54,23 @@ export const REGIONS = Object.fromEntries(
 
 export const REGION_CODES = Object.keys(REGIONS);
 export const imageName = code => `qnh-${code}.png`;
+
+/**
+ * Fingerprint of the framing itself.
+ *
+ * The forecast is not the only thing that changes what a chart should look
+ * like -- so does editing a region's bounds. Without this, widening the South
+ * East chart to stop clipping Area 24 deployed the new code but left the old
+ * images on disk until the Bureau happened to issue a new forecast.
+ */
+const LAYOUT_REVISION = createHash('sha256')
+  .update(JSON.stringify(REGIONS))
+  .digest('hex')
+  .slice(0, 12);
+
+/** The key that decides whether the rendered images are still current. */
+export const renderRevision = forecastRevision =>
+  `${forecastRevision ?? 'none'}#${LAYOUT_REVISION}`;
 
 async function readState() {
   try {
@@ -145,21 +163,28 @@ export async function renderAll(baseUrl, { log = console.log } = {}) {
  * Renders only if the forecast has changed since the last render.
  * @param {string} revision current forecast revision, from revisionOf()
  */
-export async function renderIfChanged(baseUrl, revision, { force = false, log = console.log } = {}) {
+export async function renderIfChanged(baseUrl, forecastRevision, { force = false, log = console.log } = {}) {
+  const revision = renderRevision(forecastRevision);
   const state = await readState();
 
-  if (!force && revision && state.revision === revision && await imagesPresent()) {
+  if (!force && state.revision === revision && await imagesPresent()) {
     return { rendered: false, reason: 'unchanged', revision };
   }
 
+  const reason = force ? 'forced'
+    : state.revision && state.revision.split('#')[1] !== LAYOUT_REVISION ? 'layout changed'
+      : 'forecast changed';
+
+  log(`[render] ${reason}`);
   const images = await renderAll(baseUrl, { log });
   await writeState({
-    revision: revision ?? null,
+    revision,
+    forecastRevision: forecastRevision ?? null,
     renderedAt: new Date().toISOString(),
     images,
   });
 
-  return { rendered: true, reason: force ? 'forced' : 'changed', revision, images };
+  return { rendered: true, reason, revision, images };
 }
 
 /** True only if every expected image actually exists on disk. */
